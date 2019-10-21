@@ -10,6 +10,7 @@ class Boat:
     def __init__(self, pose):
         self.pose = pose
         self.vel = 0  # linear and angular vel
+        self.patch = ...  # polygon to outline the boat
 
 
 def set_bnd(N, b, x):
@@ -20,26 +21,27 @@ def set_bnd(N, b, x):
     vertical component of the velocity should be zero on the horizontal walls.
     For the density and other fields considered in the code we simply assume
     continuity. The following code implements these conditions.
+    b = 0: continuity (used for dye density)
+    b = 1: horizontal vel reflection
+    b = 2: vertical vel reflection
+    x: density/velocity field
     """
 
     for i in range(1, N + 1):
         if b == 1:
             x[0, i] = -x[1, i]
-        else:
-            x[0, i] = x[1, i]
-        if b == 1:
             x[N + 1, i] = -x[N, i]
         else:
+            x[0, i] = x[1, i]
             x[N + 1, i] = x[N, i]
         if b == 2:
             x[i, 0] = -x[i, 1]
-        else:
-            x[i, 0] = x[i, 1]
-        if b == 2:
             x[i, N + 1] = -x[i, N]
         else:
+            x[i, 0] = x[i, 1]
             x[i, N + 1] = x[i, N]
 
+    # set corners
     x[0, 0] = 0.5 * (x[1, 0] + x[0, 1])
     x[0, N + 1] = 0.5 * (x[1, N + 1] + x[0, N])
     x[N + 1, 0] = 0.5 * (x[N, 0] + x[N + 1, 1])
@@ -77,7 +79,7 @@ def diffuse(N, b, x, x0, diff, dt):
     lin_solve(N, b, x, x0, a, 1 + 4 * a)
 
 
-def advect(N, b, d, d0, u, v, dt):
+def advect(N, b, d, d0, follow_vel, dt):
     """Advection: the density follows the velocity field.
 
     The basic idea behind the advection step. Instead of moving the cell
@@ -90,8 +92,8 @@ def advect(N, b, d, d0, u, v, dt):
     for i in range(1, N + 1):
         for j in range(1, N + 1):
             # project backwards through time
-            x = i - dt0 * u[i, j]
-            y = j - dt0 * v[i, j]
+            x = i - dt0 * follow_vel.u[i, j]
+            y = j - dt0 * follow_vel.v[i, j]
 
             # bound density to be within the window
             x = min(max(x, 0.5), N + 0.5)
@@ -102,9 +104,12 @@ def advect(N, b, d, d0, u, v, dt):
     set_bnd(N, b, d)
 
 
-def project(N, u, v, p, div):
+def project(N, vel, vel_prev):
     """project."""
-
+    u = vel.u
+    v = vel.v
+    p = vel_prev.u
+    div = vel_prev.v
     h = 1.0 / N
     div[1:N + 1, 1:N + 1] = (-0.5 * h *
                              (u[2:N + 2, 1:N + 1] - u[0:N, 1:N + 1] +
@@ -119,7 +124,7 @@ def project(N, u, v, p, div):
     set_bnd(N, 2, v)
 
 
-def dens_step(N, x, x0, u, v, diff, dt):
+def dens_step(N, x, x0, vel, diff, dt):
     """Evolving density.
 
     It implies advection, diffusion, addition of sources.
@@ -129,24 +134,24 @@ def dens_step(N, x, x0, u, v, diff, dt):
     x0, x = x, x0  # swap
     diffuse(N, 0, x, x0, diff, dt)
     x0, x = x, x0  # swap
-    advect(N, 0, x, x0, u, v, dt)
+    advect(N, 0, x, x0, vel, dt)
 
 
-def vel_step(N, u, v, u0, v0, visc, dt):
+def vel_step(N, vel, vel_prev, visc, dt):
     """Evolving velocity.
 
     It implies self-advection, viscous diffusion, addition of forces.
     """
 
-    add_source(N, u, u0, dt)
-    add_source(N, v, v0, dt)
-    u0, u = u, u0  # swap
-    diffuse(N, 1, u, u0, visc, dt)
-    v0, v = v, v0  # swap
-    diffuse(N, 2, v, v0, visc, dt)
-    project(N, u, v, u0, v0)
-    u0, u = u, u0  # swap
-    v0, v = v, v0  # swap
-    advect(N, 1, u, u0, u0, v0, dt)
-    advect(N, 2, v, v0, u0, v0, dt)
-    project(N, u, v, u0, v0)
+    add_source(N, vel.u, vel_prev.u, dt)
+    add_source(N, vel.v, vel_prev.v, dt)
+    vel, vel_prev = vel_prev, vel
+
+    diffuse(N, 1, vel.u, vel_prev.u, visc, dt)
+    diffuse(N, 2, vel.v, vel_prev.v, visc, dt)
+    project(N, vel, vel_prev)
+    vel, vel_prev = vel_prev, vel
+
+    advect(N, 1, vel.u, vel_prev.u, vel_prev, dt)
+    advect(N, 2, vel.v, vel_prev.v, vel_prev, dt)
+    project(N, vel, vel_prev)

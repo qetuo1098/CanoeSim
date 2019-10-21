@@ -26,6 +26,7 @@ import numpy as np
 from solver_c import vel_step, dens_step
 import enum
 from dataclasses import dataclass, field
+from copy import copy
 
 try:
     from OpenGL.GLUT import *
@@ -58,6 +59,26 @@ class Window:
         self.size = self.res + 2
 
 
+@dataclass
+class VelFlow:
+    u: np.array
+    v: np.array
+    sizex: int
+    sizey: int
+
+    def __init__(self, sizex, sizey):
+        self.u = np.zeros((sizex, sizey))
+        self.v = np.zeros((sizex, sizey))
+        self.sizex = sizex
+        self.sizey = sizey
+
+    def __copy__(self):
+        new_vel_flow = VelFlow(self.sizex, self.sizey)
+        new_vel_flow.u = np.copy(self.u)
+        new_vel_flow.v = np.copy(self.v)
+        return new_vel_flow
+
+
 draw_style = DrawStyle.DYE_DENSITY
 
 dt = 0.05
@@ -81,10 +102,8 @@ cell's center position backwards through the velocity field. We then linearly
 interpolate from the grid of previous density values and assign this value to
 the current grid cell.
 """
-u = np.zeros((window.size, window.size), np.float64)  # velocity
-u_prev = np.zeros((window.size, window.size), np.float64)
-v = np.zeros((window.size, window.size), np.float64)  # velocity
-v_prev = np.zeros((window.size, window.size), np.float64)
+vel = VelFlow(window.size, window.size)
+vel_prev = copy(vel)
 dens = np.zeros((window.size, window.size), np.float64)  # density
 dens_prev = np.zeros((window.size, window.size), np.float64)
 
@@ -92,13 +111,13 @@ dens_prev = np.zeros((window.size, window.size), np.float64)
 def clear_data():
     """clear_data."""
 
-    global u, v, u_prev, v_prev, dens, dens_prev, window
+    global dens, dens_prev, window, vel, vel_prev
 
     size = window.size
-    u[0:size, 0:size] = 0.0
-    v[0:size, 0:size] = 0.0
-    u_prev[0:size, 0:size] = 0.0
-    v_prev[0:size, 0:size] = 0.0
+    vel.u[0:size, 0:size] = 0.0
+    vel.v[0:size, 0:size] = 0.0
+    vel_prev.u[0:size, 0:size] = 0.0
+    vel_prev.v[0:size, 0:size] = 0.0
     dens[0:size, 0:size] = 0.0
     dens_prev[0:size, 0:size] = 0.0
 
@@ -135,7 +154,7 @@ def draw_velocity():
             y = (j - 0.5) * h
             glColor3f(1, 0, 0)
             glVertex2f(x, y)
-            glVertex2f(x + u[i, j], y + v[i, j])
+            glVertex2f(x + vel.u[i, j], y + vel.v[i, j])
     glEnd()
 
 
@@ -165,14 +184,14 @@ def draw_density():
     glEnd()
 
 
-def get_from_UI(d, u, v):
+def get_from_UI(d, vel):
     """get_from_UI."""
 
     global old_mouse_pose
 
     d[0:window.size, 0:window.size] = 0.0
-    u[0:window.size, 0:window.size] = 0.0
-    v[0:window.size, 0:window.size] = 0.0
+    vel.u[0:window.size, 0:window.size] = 0.0
+    vel.v[0:window.size, 0:window.size] = 0.0
 
     if not mouse_down[GLUT_LEFT_BUTTON] and not mouse_down[GLUT_RIGHT_BUTTON]:
         return
@@ -184,8 +203,8 @@ def get_from_UI(d, u, v):
         return
 
     if mouse_down[GLUT_LEFT_BUTTON]:
-        u[i, j] = force * (curr_mouse_pose.x - old_mouse_pose.x)
-        v[i, j] = force * (old_mouse_pose.y - curr_mouse_pose.y)
+        vel.u[i, j] = force * (curr_mouse_pose.x - old_mouse_pose.x)
+        vel.v[i, j] = force * (old_mouse_pose.y - curr_mouse_pose.y)
 
     if mouse_down[GLUT_RIGHT_BUTTON]:
         d[i, j] = source
@@ -238,12 +257,11 @@ def reshape_func(width, height):
 def idle_func():
     """idle_func."""
 
-    global dens, dens_prev, u, u_prev, v, v_prev, window, visc, dt, diff
-    N = window.res
+    global dens, dens_prev, u, u_prev, v, v_prev, window, visc, dt, diff, vel, vel_prev
 
-    get_from_UI(dens_prev, u_prev, v_prev)
-    vel_step(N, u, v, u_prev, v_prev, visc, dt)
-    dens_step(N, dens, dens_prev, u, v, diff, dt)
+    get_from_UI(dens_prev, vel_prev)
+    vel_step(window.res, vel, vel_prev, visc, dt)
+    dens_step(window.res, dens, dens_prev, vel, diff, dt)
 
     glutPostRedisplay()
 
