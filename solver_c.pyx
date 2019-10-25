@@ -3,14 +3,8 @@
 Parts of author's work are also protected
 under U. S. patent #6,266,071 B1 [Patent].
 """
-import numpy as np
 from bilinear_interp import bilinear_interp
-
-class Boat:
-    def __init__(self, pose):
-        self.pose = pose
-        self.vel = 0  # linear and angular vel
-        self.patch = ...  # polygon to outline the boat
+from types_common import *
 
 
 def set_bnd(N, b, x):
@@ -104,12 +98,12 @@ def advect(N, b, d, d0, follow_vel, dt):
     set_bnd(N, b, d)
 
 
-def project(N, vel, vel_prev):
+def project(N, vel, vel_new_source):
     """project."""
     u = vel.u
     v = vel.v
-    p = vel_prev.u
-    div = vel_prev.v
+    p = vel_new_source.u
+    div = vel_new_source.v
     h = 1.0 / N
     div[1:N + 1, 1:N + 1] = (-0.5 * h *
                              (u[2:N + 2, 1:N + 1] - u[0:N, 1:N + 1] +
@@ -137,21 +131,21 @@ def dens_step(N, x, x0, vel, diff, dt):
     advect(N, 0, x, x0, vel, dt)
 
 
-def vel_step(N, vel, vel_prev, visc, dt):
+def vel_step(N, vel, vel_new_source, visc, dt):
     """Evolving velocity.
 
     It implies self-advection, viscous diffusion, addition of forces.
     """
 
-    add_source(N, vel.u, vel_prev.u, dt)
-    add_source(N, vel.v, vel_prev.v, dt)
-    vel, vel_prev = vel_prev, vel
+    add_source(N, vel.u, vel_new_source.u, dt)
+    add_source(N, vel.v, vel_new_source.v, dt)
+    vel, vel_new_source = vel_new_source, vel
 
-    diffuse(N, 1, vel.u, vel_prev.u, visc, dt)
-    diffuse(N, 2, vel.v, vel_prev.v, visc, dt)
-    project(N, vel, vel_prev)
-    vel, vel_prev = vel_prev, vel
+    diffuse(N, 1, vel.u, vel_new_source.u, visc, dt)
+    diffuse(N, 2, vel.v, vel_new_source.v, visc, dt)
+    project(N, vel, vel_new_source)
+    vel, vel_new_source = vel_new_source, vel
 
-    advect(N, 1, vel.u, vel_prev.u, vel_prev, dt)
-    advect(N, 2, vel.v, vel_prev.v, vel_prev, dt)
-    project(N, vel, vel_prev)
+    advect(N, 1, vel.u, vel_new_source.u, vel_new_source, dt)
+    advect(N, 2, vel.v, vel_new_source.v, vel_new_source, dt)
+    project(N, vel, vel_new_source)

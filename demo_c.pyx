@@ -81,13 +81,13 @@ u_prev = np.zeros((size, size), np.float64)
 v = np.zeros((size, size), np.float64)  # velocity
 v_prev = np.zeros((size, size), np.float64)
 dens = np.zeros((size, size), np.float64)  # density
-dens_prev = np.zeros((size, size), np.float64)
+dens_new_source = np.zeros((size, size), np.float64)
 
 
 def clear_data():
     """clear_data."""
 
-    global u, v, u_prev, v_prev, dens, dens_prev, size
+    global u, v, u_prev, v_prev, dens, dens_new_source, size
 
     u[0:size, 0:size] = 0.0
     v[0:size, 0:size] = 0.0
@@ -232,7 +232,7 @@ def reshape_func(width, height):
 def idle_func():
     """idle_func."""
 
-    global dens, dens_prev, u, u_prev, v, v_prev, N, visc, dt, diff
+    global dens, dens_new_source, u, u_prev, v, v_prev, N, visc, dt, diff
 
     get_from_UI(dens_prev, u_prev, v_prev)
     vel_step(N, u, v, u_prev, v_prev, visc, dt)

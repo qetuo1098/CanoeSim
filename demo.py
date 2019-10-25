@@ -22,11 +22,7 @@ How to use this demo:
 """
 
 import sys
-import numpy as np
-from solver_c import vel_step, dens_step
-import enum
-from dataclasses import dataclass, field
-from copy import copy
+from solver_c import *
 
 try:
     from OpenGL.GLUT import *
@@ -36,7 +32,7 @@ except ImportError:
     print('ERROR: PyOpenGL not installed properly.')
     sys.exit()
 
-
+# Demo objects
 class DrawStyle(enum.Enum):
     DYE_DENSITY = enum.auto()
     FLOW_VELOCITY = enum.auto()
@@ -58,32 +54,12 @@ class Window:
     def __post_init__(self):
         self.size = self.res + 2
 
-
-@dataclass
-class VelFlow:
-    u: np.array
-    v: np.array
-    sizex: int
-    sizey: int
-
-    def __init__(self, sizex, sizey):
-        self.u = np.zeros((sizex, sizey))
-        self.v = np.zeros((sizex, sizey))
-        self.sizex = sizex
-        self.sizey = sizey
-
-    def __copy__(self):
-        new_vel_flow = VelFlow(self.sizex, self.sizey)
-        new_vel_flow.u = np.copy(self.u)
-        new_vel_flow.v = np.copy(self.v)
-        return new_vel_flow
-
-
+# main code
 draw_style = DrawStyle.DYE_DENSITY
 
 dt = 0.05
 diff = 0.0
-visc = 0.0
+visc = 0.005
 force = 5.0
 source = 100.0
 
@@ -103,23 +79,23 @@ interpolate from the grid of previous density values and assign this value to
 the current grid cell.
 """
 vel = VelFlow(window.size, window.size)
-vel_prev = copy(vel)
+vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), np.float64)  # density
-dens_prev = np.zeros((window.size, window.size), np.float64)
+dens_new_source = np.zeros((window.size, window.size), np.float64)
 
 
 def clear_data():
     """clear_data."""
 
-    global dens, dens_prev, window, vel, vel_prev
+    global dens, dens_new_source, window, vel, vel_new_source
 
     size = window.size
     vel.u[0:size, 0:size] = 0.0
     vel.v[0:size, 0:size] = 0.0
-    vel_prev.u[0:size, 0:size] = 0.0
-    vel_prev.v[0:size, 0:size] = 0.0
+    vel_new_source.u[0:size, 0:size] = 0.0
+    vel_new_source.v[0:size, 0:size] = 0.0
     dens[0:size, 0:size] = 0.0
-    dens_prev[0:size, 0:size] = 0.0
+    dens_new_source[0:size, 0:size] = 0.0
 
 
 def pre_display():
@@ -257,11 +233,11 @@ def reshape_func(width, height):
 def idle_func():
     """idle_func."""
 
-    global dens, dens_prev, u, u_prev, v, v_prev, window, visc, dt, diff, vel, vel_prev
+    global dens, dens_new_source, u, u_prev, v, v_prev, window, visc, dt, diff, vel, vel_new_source
 
-    get_from_UI(dens_prev, vel_prev)
-    vel_step(window.res, vel, vel_prev, visc, dt)
-    dens_step(window.res, dens, dens_prev, vel, diff, dt)
+    get_from_UI(dens_new_source, vel_new_source)
+    vel_step(window.res, vel, vel_new_source, visc, dt)
+    dens_step(window.res, dens, dens_new_source, vel, diff, dt)
 
     glutPostRedisplay()
 
