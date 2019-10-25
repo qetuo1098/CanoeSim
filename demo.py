@@ -80,8 +80,11 @@ the current grid cell.
 """
 vel = VelFlow(window.size, window.size)
 vel_new_source = copy(vel)
-dens = np.zeros((window.size, window.size), np.float64)  # density
-dens_new_source = np.zeros((window.size, window.size), np.float64)
+dens = np.zeros((window.size, window.size), float64)  # density
+dens_new_source = np.zeros((window.size, window.size), float64)
+
+boat = Boat((4, 2), 100, Pose(20, 10, 5*pi/6))
+counter = 0
 
 
 def clear_data():
@@ -234,10 +237,15 @@ def idle_func():
     """idle_func."""
 
     global dens, dens_new_source, u, u_prev, v, v_prev, window, visc, dt, diff, vel, vel_new_source
+    global boat, counter
 
     get_from_UI(dens_new_source, vel_new_source)
     vel_step(window.res, vel, vel_new_source, visc, dt)
     dens_step(window.res, dens, dens_new_source, vel, diff, dt)
+
+    # counter += 1
+    # if counter % 5 == 0:
+    #     print(boat.getBoundaryPoints())
 
     glutPostRedisplay()
 
