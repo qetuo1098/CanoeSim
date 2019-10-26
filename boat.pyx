@@ -9,7 +9,7 @@ class Boat:
             raise ValueError("Expect ellipse with dimensions b <= a")
 
         self.SHAPE = shape  # (a = major_axis, b = minor_axis)
-        self.pose = pose
+        self.pose = pose  # pose of canoe. Note: DO NOT DIRECTLY EDIT self.pose
         self.vel = vel  # linear and angular vel
 
         # rotation matrix
@@ -18,11 +18,19 @@ class Boat:
         self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)  # polygon to outline the boat
 
         # circumference points
+
+        # angles from 0 to 2pi, discretized st. the arc lengths between consecutive angles are the same
         discretized_angles = angles_in_ellipse(discretization, self.SHAPE[0], self.SHAPE[1])
+
+        # circumference points in the boat frame
         self.default_circumference_points = np.vstack((self.SHAPE[0]*cos(discretized_angles),
                                                        self.SHAPE[1]*sin(discretized_angles))).T
+
+        # circumference points in the world frame
         self.circumference_points = np.empty(self.default_circumference_points.shape)
         self.updateCircumferencePoints()
+
+        # radius (distance from centre to point) of each circumference point (regardless of frame)
         self.circumference_points_radii = sqrt(square(self.circumference_points[:, 0]) +
                                                square(self.circumference_points[:, 1]))
 
@@ -44,11 +52,12 @@ class Boat:
 
     def getForces(self, vel_field):
         """
-        Sums up the velocities at all points. When the points outlines a rigid body, it becomes a surface integral of
-        velocities
-        :param points: Nx2, N=number of points to integrate over
+        Gets the current force and torque on the canoe in a given velocity field.
+        Force: sums up the velocities at all points on the circumference (surface integral of velocities)
+        Torque: sums up the cross product of the radii of all points on the circumference with velocities at these
+        points (r x f)
         :param vel_field: VelField
-        :return: forces: (2,) np array of forces
+        :return: (forces, torque): forces = (2,) np array of forces, torque = float64 total torque
         """
         total_forces = np.zeros(2)
         total_torque = 0
@@ -66,4 +75,5 @@ class Boat:
         return total_forces, total_torque
 
     def movePose(self, pose):
+        # move canoe by pose wrt to its current pose
         self.setPose(self.pose + pose)

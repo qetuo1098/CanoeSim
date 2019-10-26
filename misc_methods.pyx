@@ -1,7 +1,7 @@
 import numpy as np
 
 def bilinear_interp(d0, x, y):
-
+    # bilinearly interpolate value at field d0[x,y], with x,y being floats
     x0, x1 = int(x), int(x) + 1
     y0, y1 = int(y), int(y) + 1
     s0, s1 = x1 - x, x - x0
@@ -20,6 +20,7 @@ def angleWrap(theta):
     return theta
 
 def angleToC(theta):
+    # get rotation matrix from theta
     cosx, sinx = np.cos(theta), np.sin(theta)
     C = np.array([[cosx, -sinx], [sinx, cosx]])
     return C

@@ -31,8 +31,8 @@ class Pose:
         return Pose(self.point[0], self.point[1], self.theta)
 
     def __iadd__(self, other):
+        # the second vector is added to the first in the frame of the first
         C = angleToC(-self.theta)
-        print(self.point, (C @ other.point.reshape((2,1))).ravel())
         self.point += (C @ other.point.reshape((2,1))).ravel()
         self.theta += other.theta
         self.theta = angleWrap(self.theta)
