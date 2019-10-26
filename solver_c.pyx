@@ -3,8 +3,7 @@
 Parts of author's work are also protected
 under U. S. patent #6,266,071 B1 [Patent].
 """
-from bilinear_interp import bilinear_interp
-from types_common import *
+from boat import *
 
 
 def set_bnd(N, b, x):

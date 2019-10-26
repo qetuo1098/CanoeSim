@@ -30,7 +30,7 @@ import os
 #
 
 setup(
-    ext_modules=cythonize(["solver_c.pyx", "types_common.pyx"], language_level="3"),
+    ext_modules=cythonize(["solver_c.pyx", "types_common.pyx", "boat.pyx", "misc_methods.pyx"], language_level="3"),
     include_dirs = [numpy.get_include()], requires=['numpy']
     # cmdclass={
     #     'install_lib': _CommandInstallCythonized,

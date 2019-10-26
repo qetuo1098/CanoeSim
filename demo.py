@@ -63,7 +63,7 @@ visc = 0.005
 force = 5.0
 source = 100.0
 
-window = Window(width_x=1024, height_y=768, res=64)
+window = Window(width_x=768, height_y=768, res=64)
 
 old_mouse_pose = MousePose(0, 0)
 curr_mouse_pose = MousePose(0, 0)
@@ -78,12 +78,12 @@ cell's center position backwards through the velocity field. We then linearly
 interpolate from the grid of previous density values and assign this value to
 the current grid cell.
 """
-vel = VelFlow(window.size, window.size)
+vel = VelField(window.size, window.size)
 vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
-boat = Boat((4, 2), 100, Pose(20, 10, 5*pi/6))
+boat = Boat((5, 15), 300, Pose(30, 30, 7*pi/6))
 counter = 0
 
 
@@ -116,6 +116,17 @@ def post_display():
     """post_display."""
 
     glutSwapBuffers()
+
+def draw_boat():
+    h = 1.0 / window.res
+
+    glColor3f(1.0, 1.0, 1.0)
+    glPointSize(5.0)
+
+    glBegin(GL_POINTS)
+    for point in boat.circumference_points:
+        glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
+    glEnd()
 
 
 def draw_velocity():
@@ -203,6 +214,14 @@ def key_func(key, mouse_x, mouse_y):
             draw_style = DrawStyle.DYE_DENSITY
         else:
             draw_style = DrawStyle.FLOW_VELOCITY
+    if key == b'a':
+        boat.movePose(Pose(0, 0, 0.1))
+    if key == b'd':
+        boat.movePose(Pose(0, 0, -0.1))
+    if key == b'w':
+        boat.movePose(Pose(0, 1, 0))
+    if key == b's':
+        boat.movePose(Pose(0, -1, 0))
 
 
 def mouse_func(button, state, mouse_x, mouse_y):
@@ -236,16 +255,16 @@ def reshape_func(width, height):
 def idle_func():
     """idle_func."""
 
-    global dens, dens_new_source, u, u_prev, v, v_prev, window, visc, dt, diff, vel, vel_new_source
+    global dens, dens_new_source, window, visc, dt, diff, vel, vel_new_source
     global boat, counter
 
     get_from_UI(dens_new_source, vel_new_source)
     vel_step(window.res, vel, vel_new_source, visc, dt)
     dens_step(window.res, dens, dens_new_source, vel, diff, dt)
 
-    # counter += 1
-    # if counter % 5 == 0:
-    #     print(boat.getBoundaryPoints())
+    counter += 1
+    if counter % 5 == 0:
+        print("Force: ", boat.getForces(vel))
 
     glutPostRedisplay()
 
@@ -258,6 +277,7 @@ def display_func():
         draw_velocity()
     elif draw_style == DrawStyle.DYE_DENSITY:
         draw_density()
+    draw_boat()
     post_display()
 
 
