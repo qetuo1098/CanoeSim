@@ -130,7 +130,7 @@ def dens_step(N, x, x0, vel, diff, dt):
     advect(N, 0, x, x0, vel, dt)
 
 
-def vel_step(N, vel, vel_new_source, visc, dt):
+def vel_step(N, vel, vel_new_source, visc, dt, boat):
     """Evolving velocity.
 
     It implies self-advection, viscous diffusion, addition of forces.
@@ -138,6 +138,7 @@ def vel_step(N, vel, vel_new_source, visc, dt):
 
     add_source(N, vel.u, vel_new_source.u, dt)
     add_source(N, vel.v, vel_new_source.v, dt)
+    propelVelField(vel, boat)
     vel, vel_new_source = vel_new_source, vel
 
     diffuse(N, 1, vel.u, vel_new_source.u, visc, dt)

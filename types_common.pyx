@@ -78,13 +78,17 @@ class Pose:
         if isinstance(other, Pose):
             raise ValueError("Cannot multiply a Pose by a Pose. RHS must be scalar")
         self.point *= other
-        self.theta = angleWrap(self.theta * other)
+        self.theta *= other
         return self
 
     def __mul__(self, other):
         new_pose = copy(self)
         new_pose *= other
         return new_pose
+
+    def wrapAngle(self):
+        self.theta = angleWrap(self.theta)
+        return self
 
 
 @dataclass

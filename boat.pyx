@@ -39,7 +39,7 @@ class Boat:
         self.force_scale_w = 1/10000
 
     def setPose(self, pose):
-        self.pose = copy(pose)
+        self.pose = copy(pose).wrapAngle()
         # if not isclose(pose.theta, self.pose.theta):
         self.C = angleToC(pose.theta)
         # if not isclose(pose.theta, self.pose.theta) or not isclose(pose.point, self.pose.point).all():
@@ -84,19 +84,37 @@ class Boat:
         self.setPose(self.pose + pose)
         return
 
-    def propelCanoe(self, dt):
+    def propelBoat(self, dt):
         # propel canoe by its current velocity by time dt
         self.moveByPose(self.vel * dt)
         return
 
     def stepForward(self, vel_field, dt):
+        vel_damper = 0.95
+
         # first update velocity from force
         total_forces, total_torque = self.getForces(vel_field)
-        # total_forces, total_torque = (0, -10)
+        self.vel.point += -total_forces * self.force_scale_v  # ToDo: find out why force has to be negative
+        self.vel.theta += -total_torque * self.force_scale_w  # ToDo: find out why torque has to be negative
 
-        self.vel.point += total_forces * self.force_scale_v
-        self.vel.theta += total_torque * self.force_scale_w
+        # then damp with friction
+        self.vel *= vel_damper
 
         # then propel canoe forward
-        self.propelCanoe(dt)
+        self.propelBoat(dt)
         return
+
+
+def propelVelField(vel_field, boat):
+    """
+    Change velocity field based on canoe's movement
+    :param vel_field: VelField
+    :param boat: Boat
+    :return: None
+    """
+    scaling = 1E-5
+    for i in range(len(boat.circumference_points)):
+        point = boat.circumference_points[i]
+        point_vel = boat.vel.point + boat.vel.theta * boat.circumference_points_radii[i]  # linear + angular vel
+        vel_field.u[int(point[0]), int(point[1])] += scaling * point_vel[0]
+        vel_field.v[int(point[0]), int(point[1])] += scaling * point_vel[1]

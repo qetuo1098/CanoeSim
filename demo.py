@@ -259,7 +259,7 @@ def idle_func():
     global boat, counter
 
     get_from_UI(dens_new_source, vel_new_source)
-    vel_step(window.res, vel, vel_new_source, visc, dt)
+    vel_step(window.res, vel, vel_new_source, visc, dt, boat)
     dens_step(window.res, dens, dens_new_source, vel, diff, dt)
 
     counter += 1
