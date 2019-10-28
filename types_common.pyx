@@ -9,6 +9,7 @@ from misc_methods import *
 pi = np.pi
 
 # Solver objects
+"""
 @dataclass
 class Twist:
     v: float64(dtype=float64)
@@ -17,6 +18,36 @@ class Twist:
     def __init__(self):
         self.v = self.w = 0.0
 
+    def __iadd__(self, other):
+        if not isinstance(other, Twist):
+            raise ValueError("Can only add Twist to a Twist")
+        self.v += other.v
+        self.w = angleWrap(self.w + other.w)
+        return self
+
+    def __add__(self, other):
+        new_twist = self
+        new_twist += other
+        return new_twist
+
+    def __imul__(self, other):
+        if isinstance(other, Twist):
+            raise ValueError("Cannot multiply a Twist by a Twist")
+        self.v *= other
+        self.w = angleWrap(self.w * other)
+        return self
+
+    def __mul__(self, other):
+        new_twist = self
+        new_twist *= other
+        return new_twist
+
+    def scale(self, scale):
+        v_scale, w_scale = scale
+        self.v *= v_scale
+        self.w =  angleWrap(self.w * w_scale)
+        return self
+"""
 
 @dataclass
 class Pose:
@@ -41,6 +72,18 @@ class Pose:
     def __add__(self, other):
         new_pose = copy(self)
         new_pose += other
+        return new_pose
+
+    def __imul__(self, other):
+        if isinstance(other, Pose):
+            raise ValueError("Cannot multiply a Pose by a Pose. RHS must be scalar")
+        self.point *= other
+        self.theta = angleWrap(self.theta * other)
+        return self
+
+    def __mul__(self, other):
+        new_pose = copy(self)
+        new_pose *= other
         return new_pose
 
 

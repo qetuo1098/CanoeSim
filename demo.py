@@ -83,7 +83,7 @@ vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
-boat = Boat((5, 15), 300, Pose(30, 30, 7*pi/6))
+boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
 
@@ -215,13 +215,13 @@ def key_func(key, mouse_x, mouse_y):
         else:
             draw_style = DrawStyle.FLOW_VELOCITY
     if key == b'a':
-        boat.movePose(Pose(0, 0, 0.1))
+        boat.moveByPose(Pose(0, 0, 0.1))
     if key == b'd':
-        boat.movePose(Pose(0, 0, -0.1))
+        boat.moveByPose(Pose(0, 0, -0.1))
     if key == b'w':
-        boat.movePose(Pose(0, 1, 0))
+        boat.moveByPose(Pose(1, 0, 0))
     if key == b's':
-        boat.movePose(Pose(0, -1, 0))
+        boat.moveByPose(Pose(-1, 0, 0))
 
 
 def mouse_func(button, state, mouse_x, mouse_y):
@@ -263,6 +263,7 @@ def idle_func():
     dens_step(window.res, dens, dens_new_source, vel, diff, dt)
 
     counter += 1
+    boat.stepForward(vel, dt)
     if counter % 5 == 0:
         print("Force: ", boat.getForces(vel))
 

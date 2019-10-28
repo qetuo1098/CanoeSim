@@ -13,9 +13,9 @@ def bilinear_interp(d0, x, y):
 
 def angleWrap(theta):
     # wraps to between [0, 2pi]
-    while theta < 0:
+    while theta < -np.pi:
         theta += 2*np.pi
-    while theta > 2*np.pi:
+    while theta > np.pi:
         theta -= 2*np.pi
     return theta
 
