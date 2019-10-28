@@ -35,7 +35,7 @@ class Boat:
                                                square(self.circumference_points[:, 1]))
 
         # force scaling from velocity to move the canoe. ToDo: make this scale common with the other forces (mouse)
-        self.force_scale_v = 1/100
+        self.force_scale_v = 3/100
         self.force_scale_w = 1/10000
 
     def setPose(self, pose):
@@ -90,7 +90,7 @@ class Boat:
         return
 
     def stepForward(self, vel_field, dt):
-        vel_damper = 0.95
+        vel_damper = 0.90
 
         # first update velocity from force
         total_forces, total_torque = self.getForces(vel_field)
@@ -112,7 +112,7 @@ def propelVelField(vel_field, boat):
     :param boat: Boat
     :return: None
     """
-    scaling = 1E-5
+    scaling = 5E-5
     for i in range(len(boat.circumference_points)):
         point = boat.circumference_points[i]
         point_vel = boat.vel.point + boat.vel.theta * boat.circumference_points_radii[i]  # linear + angular vel
