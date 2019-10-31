@@ -125,17 +125,20 @@ class Boat:
 
         # force scaling from velocity to move the canoe. ToDo: make this scale common with the other forces (mouse)
         self.force_scale_v = 3/100
-        self.force_scale_w = 1/10000
+        self.force_scale_w = 3/10000
 
         # paddle
         self.paddle = Paddle(pose=Pose(0, self.SHAPE[1], pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100)
+        self.paddle2 = Paddle(pose=Pose(0, -self.SHAPE[1], -pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100)
+        self.paddle_list = [self.paddle, self.paddle2]
 
     def setPose(self, pose):
         self.pose = copy(pose).wrapAngle()
         self.C = angleToC(pose.theta)
         self.updateCircumferencePoints()
         self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)
-        self.paddle.updateWorldFrameTransform(self.C, self.pose.point, self.vel)
+        for paddle in self.paddle_list:
+            paddle.updateWorldFrameTransform(self.C, self.pose.point, self.vel)
         return
 
     def updateCircumferencePoints(self):
@@ -157,15 +160,24 @@ class Boat:
         return
 
     def getWrenches(self, vel_field):
+        total_force = total_torque = 0.0
+
         boat_force, boat_torque = calculateWrenches(vel_field, self.circumference_points, self.circumference_points_radii, self.discretized_angles, self.pose.theta)
-        paddle_force, paddle_torque = calculateWrenches(vel_field, self.paddle.points_world_frame, self.paddle.point_radii, self.paddle.point_angles, self.pose.theta)
-        opposing_force, opposing_wrench = calculateOpposingWrenches(self.paddle.vel_world_frame, self.paddle.points_world_frame, self.paddle.point_radii, self.paddle.point_angles, self.pose.theta)
-        return (boat_force+paddle_force+opposing_force, boat_torque+paddle_torque+opposing_wrench)
+        total_force += boat_force
+        total_torque += boat_torque
+
+        for paddle in self.paddle_list:
+            paddle_force, paddle_torque = calculateWrenches(vel_field, paddle.points_world_frame, paddle.point_radii, paddle.point_angles, self.pose.theta)
+            opposing_force, opposing_torque = calculateOpposingWrenches(paddle.vel_world_frame, paddle.points_world_frame, paddle.point_radii, paddle.point_angles, self.pose.theta)
+            total_force += (paddle_force + opposing_force)
+            total_torque += (paddle_torque + opposing_torque)
+        return total_force, total_torque
 
     def stepForward(self, vel_field, dt):
         vel_damper = 0.90  # todo move it somewhere else, or replace this with a general method of damping
         # update paddle location
-        self.paddle.twistPaddle()
+        for paddle in self.paddle_list:
+            paddle.twistPaddle()
 
         # first update velocity from force
         total_forces, total_torque = self.getWrenches(vel_field)
@@ -243,8 +255,9 @@ def propelVelField(vel_field, boat):
         vel_field.v[int(point[0]), int(point[1])] += scaling * point_vel[1]
 
     # paddle vel
-    for i in range(len(boat.paddle.points_world_frame)):
-        point = boat.paddle.points_world_frame[i]
-        point_vel = boat.paddle.vel_world_frame[i]
-        vel_field.u[int(point[0]), int(point[1])] += scaling * point_vel[0]
-        vel_field.v[int(point[0]), int(point[1])] += scaling * point_vel[1]
+    for paddle in boat.paddle_list:
+        for i in range(len(paddle.points_world_frame)):
+            point = paddle.points_world_frame[i]
+            point_vel = paddle.vel_world_frame[i]
+            vel_field.u[int(point[0]), int(point[1])] += scaling * point_vel[0]
+            vel_field.v[int(point[0]), int(point[1])] += scaling * point_vel[1]

@@ -83,7 +83,7 @@ vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
-boat = Boat((3, 9), 300, Pose(40, 40, 0), vel=Pose(0, 0, pi))
+boat = Boat((3, 9), 300, Pose(40, 40, 0), vel=Pose(0, 0, 0))
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
@@ -130,13 +130,14 @@ def draw_boat():
         glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
     glEnd()
 
-    # paddle
+    # paddles
     glColor3f(0.5, 0.5, 1.0)
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
-    for point in boat.paddle.points_world_frame:
-        glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
+    for paddle in boat.paddle_list:
+        for point in paddle.points_world_frame:
+            glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()
 
 
@@ -241,8 +242,13 @@ def key_func(key, mouse_x, mouse_y):
         boat.paddle.angular_vel = 10.0
     if key == b'2':
         boat.paddle.angular_vel = -10.0
-    if key != b'1' and key != b'2':
+    if key == b'3':
+        boat.paddle2.angular_vel = 10.0
+    if key == b'4':
+        boat.paddle2.angular_vel = -10.0
+    if key not in (b'1', b'2', b'3', b'4'):
         boat.paddle.angular_vel = 0
+        boat.paddle2.angular_vel = 0
 
 
 def mouse_func(button, state, mouse_x, mouse_y):
