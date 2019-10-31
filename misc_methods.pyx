@@ -24,3 +24,9 @@ def angleToC(theta):
     cosx, sinx = np.cos(theta), np.sin(theta)
     C = np.array([[cosx, -sinx], [sinx, cosx]])
     return C
+
+def orthogonal(v):
+    return np.array([-v[1], v[0]])
+
+def close(a,b):
+    return abs(a-b) < 1E-7
