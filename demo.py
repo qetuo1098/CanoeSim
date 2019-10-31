@@ -63,7 +63,7 @@ visc = 0.005
 force = 5.0
 source = 100.0
 
-window = Window(width_x=768, height_y=768, res=64)
+window = Window(width_x=900, height_y=900, res=64)
 
 old_mouse_pose = MousePose(0, 0)
 curr_mouse_pose = MousePose(0, 0)
@@ -83,7 +83,7 @@ vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
-boat = Boat((3, 9), 300, Pose(40, 40, 0))
+boat = Boat((3, 9), 300, Pose(40, 40, 0), vel=Pose(0, 0, pi))
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
@@ -238,9 +238,11 @@ def key_func(key, mouse_x, mouse_y):
     if key == b'e':
         boat.moveByPose(Pose(0, 0, -0.1))
     if key == b'1':
-        boat.paddle.twistPaddle(-0.1)
+        boat.paddle.angular_vel = 10.0
     if key == b'2':
-        boat.paddle.twistPaddle(0.1)
+        boat.paddle.angular_vel = -10.0
+    if key != b'1' and key != b'2':
+        boat.paddle.angular_vel = 0
 
 
 def mouse_func(button, state, mouse_x, mouse_y):
