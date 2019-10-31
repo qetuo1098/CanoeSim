@@ -2,11 +2,82 @@ from types_common import *
 from flyingcircus.extra import angles_in_ellipse
 from matplotlib import patches
 
+class Paddle:
+    def __init__(self, pose, theta_max, length, discretization):
+        """
+        :param pose: neutral pose (theta=0) in canoe frame, or the transformation from paddle to canoe frame
+        :param theta_max: min and max angle in paddle frame
+        :param length: length of paddle
+        :param discretization: number of points in the paddle
+        """
+        self.pose = pose
+        self.THETA_MAX = theta_max
+        self.LENGTH = length
+        self.DISCRETIZATION = discretization
+        self.theta = 0
+        self.current_canoe_C = np.identity(2)
+        self.current_canoe_point = np.zeros(2)
+
+        # make discretization lengths, a column vector from 0 to self.length
+        self.discretization_lengths = (self.LENGTH / (self.DISCRETIZATION + 1) * np.arange(0, self.DISCRETIZATION + 2))\
+            .reshape(self.DISCRETIZATION + 2, 1)
+        self.points_canoe_frame = np.zeros((self.DISCRETIZATION + 2, 2))
+        self.points_world_frame = np.zeros(self.points_canoe_frame.shape)
+        self.point_radii = np.zeros(self.DISCRETIZATION + 2)
+        self.point_angles = np.zeros(self.DISCRETIZATION + 2)
+
+        # construct C matrix
+        self.C = np.zeros((2,2))
+        self.updateTransformation()
+        self.twistPaddle(0.0)
+        return
+
+    def twistPaddle(self, dtheta):
+        # ToDo: angleWrap this. For now, min/max on a wrapped angle may cause problems
+        # print(self.theta)
+        self.theta = min(self.THETA_MAX[1], max(self.THETA_MAX[0], self.theta + dtheta))
+        self.updateTransformation()
+        self.updatePoints()
+        return
+
+    def updateTransformation(self):
+        self.C = angleToC(self.pose.theta + self.theta)
+        return
+
+    def updatePoints(self):
+        unit_paddle = np.array([1.0, 0.0])
+        points_paddle_frame = self.discretization_lengths @ unit_paddle.reshape(1, 2)
+        if points_paddle_frame.shape != self.points_canoe_frame.shape:  # extra check, can remove this later
+            raise ValueError("paddle frame and canoe frame matrices do not match")
+        # update points on the paddle (in canoe frame)
+        for i in range(len(self.points_canoe_frame)):
+            self.points_canoe_frame[i] = (self.C @ points_paddle_frame[i].reshape((2, 1)) +
+                                          self.pose.point.reshape((2, 1))).T
+        # print(self.points_canoe_frame[-1])
+        # update points_world_frame
+        for i in range(len(self.points_canoe_frame)):
+            self.points_world_frame[i] = (self.current_canoe_C @ self.points_canoe_frame[i].reshape((2, 1))
+                                          + self.current_canoe_point.reshape((2, 1))).T
+
+        # find radii and angles from centre of canoe for all points
+        differences = np.empty(self.points_canoe_frame.shape)
+        for i in range(len(self.points_canoe_frame)):
+            differences[i] = self.points_canoe_frame[i] - self.pose.point
+        self.point_radii = np.linalg.norm(differences, axis=1)
+        differences = differences.T
+        self.point_angles = np.arctan2(differences[1], differences[0])
+        return
+
+    def updateWorldFrameTransform(self, new_canoe_C, new_canoe_point):
+        self.current_canoe_C = new_canoe_C
+        self.current_canoe_point = new_canoe_point
+        return
+
 
 class Boat:
     def __init__(self, shape, discretization, pose=Pose(), vel=Pose()):
         if shape[1] < shape[0]:
-            raise ValueError("Expect ellipse with dimensions b <= a")
+            raise ValueError("Expect ellipse with dimensions a <= b")
 
         self.SHAPE = shape  # (a = major_axis, b = minor_axis)
         self.pose = copy(pose)  # pose of canoe. Note: DO NOT DIRECTLY EDIT self.pose
@@ -20,11 +91,11 @@ class Boat:
         # circumference points
 
         # angles from 0 to 2pi, discretized st. the arc lengths between consecutive angles are the same
-        discretized_angles = angles_in_ellipse(discretization, self.SHAPE[0], self.SHAPE[1])
+        self.discretized_angles = angles_in_ellipse(discretization, self.SHAPE[0], self.SHAPE[1])
 
         # circumference points in the boat frame
-        self.default_circumference_points = np.vstack((self.SHAPE[0]*cos(discretized_angles),
-                                                       self.SHAPE[1]*sin(discretized_angles))).T
+        self.default_circumference_points = np.vstack((self.SHAPE[0]*cos(self.discretized_angles),
+                                                       self.SHAPE[1]*sin(self.discretized_angles))).T
 
         # circumference points in the world frame
         self.circumference_points = np.empty(self.default_circumference_points.shape)
@@ -38,13 +109,15 @@ class Boat:
         self.force_scale_v = 3/100
         self.force_scale_w = 1/10000
 
+        # paddle
+        self.paddle = Paddle(pose=Pose(0, self.SHAPE[1], pi/2), theta_max=(-pi/2, pi/2), length=15.0, discretization=150)
+
     def setPose(self, pose):
         self.pose = copy(pose).wrapAngle()
-        # if not isclose(pose.theta, self.pose.theta):
         self.C = angleToC(pose.theta)
-        # if not isclose(pose.theta, self.pose.theta) or not isclose(pose.point, self.pose.point).all():
         self.updateCircumferencePoints()
         self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)
+        self.paddle.updateWorldFrameTransform(self.C, self.pose.point)
         return
 
     def updateCircumferencePoints(self):
@@ -54,30 +127,6 @@ class Boat:
             self.circumference_points[i] = (self.C @ self.default_circumference_points[i].reshape((2, 1)) +
                                             self.pose.point.reshape((2, 1))).T
         return
-
-    def getForces(self, vel_field):
-        """
-        Gets the current force and torque on the canoe in a given velocity field.
-        Force: sums up the velocities at all points on the circumference (surface integral of velocities)
-        Torque: sums up the cross product of the radii of all points on the circumference with velocities at these
-        points (r x f)
-        :param vel_field: VelField
-        :return: (forces, torque): forces = (2,) np array of forces, torque = float64 total torque
-        """
-        total_forces = np.zeros(2)
-        total_torque = 0
-        for i in range(self.circumference_points.shape[0]):
-            index = tuple(self.circumference_points[i])
-            forcex = bilinear_interp(vel_field.u, index[0], index[1])
-            forcey = bilinear_interp(vel_field.v, index[0], index[1])
-            # torque = radius x force = |r||f|sin(angle from r to f)
-            torque = self.circumference_points_radii[i] * np.linalg.norm(np.array([forcex, forcey])) * \
-                     sin(np.arctan2(forcey, forcex) + self.pose.theta)
-            total_forces[0] += forcex
-            total_forces[1] += forcey
-            total_torque += torque
-
-        return total_forces, total_torque
 
     def moveByPose(self, pose):
         # move canoe by pose in a frame wrt to its current pose
@@ -89,13 +138,20 @@ class Boat:
         self.moveByPose(self.vel * dt)
         return
 
+    def getWrenches(self, vel_field):
+        boat_force, boat_torque = calculateWrenches(vel_field, self.circumference_points, self.circumference_points_radii, self.discretized_angles, self.pose.theta)
+        paddle_force, paddle_torque = calculateWrenches(vel_field, self.paddle.points_world_frame, self.paddle.point_radii, self.paddle.point_angles, self.pose.theta)
+        return (boat_force+paddle_force, boat_torque+paddle_torque)
+
     def stepForward(self, vel_field, dt):
-        vel_damper = 0.90
+        vel_damper = 0.90  # todo remove this
+        # update paddle location
+        self.paddle.twistPaddle(0)
 
         # first update velocity from force
-        total_forces, total_torque = self.getForces(vel_field)
-        self.vel.point += -total_forces * self.force_scale_v  # ToDo: find out why force has to be negative
-        self.vel.theta += -total_torque * self.force_scale_w  # ToDo: find out why torque has to be negative
+        total_forces, total_torque = self.getWrenches(vel_field)
+        self.vel.point += self.C @ total_forces * self.force_scale_v  # previous bug: didn't transform force into canoe frame
+        self.vel.theta += total_torque * self.force_scale_w
 
         # then damp with friction
         self.vel *= vel_damper
@@ -104,6 +160,30 @@ class Boat:
         self.propelBoat(dt)
         return
 
+
+def calculateWrenches(vel_field, points, distances, point_angles, main_angle=0.0):  # todo: refactor main_angle
+    """
+    Gets the current force and torque on the canoe in a given velocity field.
+    Force: sums up the velocities at all points on the circumference (surface integral of velocities)
+    Torque: sums up the cross product of the radii of all points on the circumference with velocities at these
+    points (r x f)
+    :param vel_field: VelField
+    :return: (forces, torque): forces = (2,) np array of forces, torque = float64 total torque
+    """
+    total_forces = np.zeros(2)
+    total_torque = 0
+    for i in range(points.shape[0]):
+        index = tuple(points[i])
+        forcex = bilinear_interp(vel_field.u, index[0], index[1])
+        forcey = bilinear_interp(vel_field.v, index[0], index[1])
+        # torque = radius x force = |r||f|sin(angle from r to f)
+        torque = distances[i] * np.linalg.norm(np.array([forcex, forcey])) * \
+                 sin(np.arctan2(forcey, forcex) - (point_angles[i] + main_angle))
+        total_forces[0] += forcex
+        total_forces[1] += forcey
+        total_torque += torque
+
+    return total_forces, total_torque
 
 def propelVelField(vel_field, boat):
     """

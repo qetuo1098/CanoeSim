@@ -83,7 +83,8 @@ vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
-boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
+boat = Boat((3, 9), 300, Pose(40, 40, 0))
+# boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
 
@@ -120,12 +121,22 @@ def post_display():
 def draw_boat():
     h = 1.0 / window.res
 
+    # boat
     glColor3f(1.0, 1.0, 1.0)
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
     for point in boat.circumference_points:
         glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
+    glEnd()
+
+    # paddle
+    glColor3f(0.5, 0.5, 1.0)
+    glPointSize(5.0)
+
+    glBegin(GL_POINTS)
+    for point in boat.paddle.points_world_frame:
+        glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()
 
 
@@ -215,13 +226,21 @@ def key_func(key, mouse_x, mouse_y):
         else:
             draw_style = DrawStyle.FLOW_VELOCITY
     if key == b'a':
-        boat.moveByPose(Pose(0, 0, 0.1))
-    if key == b'd':
-        boat.moveByPose(Pose(0, 0, -0.1))
-    if key == b'w':
-        boat.moveByPose(Pose(1, 0, 0))
-    if key == b's':
         boat.moveByPose(Pose(-1, 0, 0))
+    if key == b'd':
+        boat.moveByPose(Pose(1, 0, 0))
+    if key == b'w':
+        boat.moveByPose(Pose(0, 1, 0))
+    if key == b's':
+        boat.moveByPose(Pose(0, -1, 0))
+    if key == b'q':
+        boat.moveByPose(Pose(0, 0, 0.1))
+    if key == b'e':
+        boat.moveByPose(Pose(0, 0, -0.1))
+    if key == b'1':
+        boat.paddle.twistPaddle(-0.1)
+    if key == b'2':
+        boat.paddle.twistPaddle(0.1)
 
 
 def mouse_func(button, state, mouse_x, mouse_y):
@@ -265,8 +284,7 @@ def idle_func():
     counter += 1
     boat.stepForward(vel, dt)
     if counter % 5 == 0:
-        print("Force: ", boat.getForces(vel))
-
+        print("Force: ", boat.getWrenches(vel))
     glutPostRedisplay()
 
 
