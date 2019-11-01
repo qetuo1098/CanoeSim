@@ -139,8 +139,8 @@ class Boat:
         self.force_scale_w = 3/10000
 
         # paddle
-        self.paddle = Paddle(pose=Pose(0, self.SHAPE[1], pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=200)
-        self.paddle2 = Paddle(pose=Pose(0, -self.SHAPE[1], -pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=200)
+        self.paddle = Paddle(pose=Pose(0, self.SHAPE[1], pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100)
+        self.paddle2 = Paddle(pose=Pose(0, -self.SHAPE[1], -pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100)
         self.paddle_list = [self.paddle, self.paddle2]
 
     def setPose(self, pose):
@@ -236,7 +236,7 @@ def calculateOpposingWrenches(paddle_vel, points, distances, point_angles, main_
     :param vel_field: VelField
     :return: (forces, torque): forces = (2,) np array of forces, torque = float64 total torque
     """
-    paddle_opposing_wrench_scalar = 2E-2
+    paddle_opposing_wrench_scalar = 4E-2
     total_forces = np.zeros(2)
     total_torque = 0
     for i in range(points.shape[0]):
