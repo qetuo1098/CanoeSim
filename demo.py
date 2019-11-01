@@ -239,13 +239,13 @@ def key_func(key, mouse_x, mouse_y):
     if key == b'e':
         boat.moveByPose(Pose(0, 0, -0.1))
     if key == b'1':
-        boat.paddle.angular_vel = 10.0
+        boat.paddle.angular_vel = 2.0
     if key == b'2':
-        boat.paddle.angular_vel = -10.0
+        boat.paddle.angular_vel = -2.0
     if key == b'3':
-        boat.paddle2.angular_vel = 10.0
+        boat.paddle2.angular_vel = 2.0
     if key == b'4':
-        boat.paddle2.angular_vel = -10.0
+        boat.paddle2.angular_vel = -2.0
     if key not in (b'1', b'2', b'3', b'4'):
         boat.paddle.angular_vel = 0
         boat.paddle2.angular_vel = 0

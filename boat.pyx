@@ -32,12 +32,12 @@ class Paddle:
         # construct C matrix
         self.C = np.zeros((2,2))
         self.updateTransformation()
-        self.twistPaddle()
+        self.twistPaddle(0)
         return
 
-    def twistPaddle(self):
+    def twistPaddle(self, dt):
         scalar = 0.01  # ToDo move this somewhere
-        dtheta = self.angular_vel * scalar
+        dtheta = self.angular_vel * dt
         # ToDo: angleWrap this. For now, min/max on a wrapped angle may cause problems
         self.theta = min(self.THETA_MAX[1], max(self.THETA_MAX[0], self.theta + dtheta))
         if close(self.theta, self.THETA_MAX[0]) or close(self.theta, self.THETA_MAX[1]):
@@ -53,14 +53,13 @@ class Paddle:
 
     def updatePoints(self):
         unit_paddle = np.array([1.0, 0.0])
-        points_paddle_frame = self.discretization_lengths @ unit_paddle.reshape(1, 2)
-        if points_paddle_frame.shape != self.points_canoe_frame.shape:  # extra check, can remove this later
+        self.points_paddle_frame = self.discretization_lengths @ unit_paddle.reshape(1, 2)
+        if self.points_paddle_frame.shape != self.points_canoe_frame.shape:  # extra check, can remove this later
             raise ValueError("paddle frame and canoe frame matrices do not match")
         # update points on the paddle (in canoe frame)
         for i in range(len(self.points_canoe_frame)):
-            self.points_canoe_frame[i] = (self.C @ points_paddle_frame[i].reshape((2, 1)) +
+            self.points_canoe_frame[i] = (self.C @ self.points_paddle_frame[i].reshape((2, 1)) +
                                           self.pose.point.reshape((2, 1))).T
-        # print(self.points_canoe_frame[-1])
         # update points_world_frame
         for i in range(len(self.points_canoe_frame)):
             self.points_world_frame[i] = (self.current_canoe_C @ self.points_canoe_frame[i].reshape((2, 1))
@@ -74,15 +73,27 @@ class Paddle:
         differences = differences.T
         self.point_angles = np.arctan2(differences[1], differences[0])
 
-        canoe_vel_world_frame = (self.current_canoe_C.T @ self.current_canoe_vel.point.reshape(2, 1)).reshape(1, 2)
+        # find velocity of paddle in world frame - used to calculate paddle opposing wrenches
+        # paddle vel = canoe vel + paddle vel due to canoe rotation + paddle vel due to paddle rotation
+        # all three terms have to be expressed in world frame
+        # see notes for derivation
+
+        # do01/dt is just the canoe's linear velocity
+        canoe_vel_world_frame = (self.current_canoe_C.T @ self.current_canoe_vel.point.reshape(2, 1)).reshape(1, 2)  # todo find out why this is C.T but below is C
         for i in range(len(self.points_canoe_frame)):
+            # omega01 x p0, where p0 is the paddle position expressed in terms of world frame axes (not simply paddle
+            # pos in world frame). For 2D, this simplifies to below
             paddle_vel_canoe_rotation = self.current_canoe_vel.theta * \
                                         orthogonal(self.points_world_frame[i] - self.current_canoe_point)
-            paddle_vel_paddle_movement = self.angular_vel * orthogonal(self.points_canoe_frame[i])
-            self.vel_world_frame[i] = canoe_vel_world_frame + paddle_vel_canoe_rotation + paddle_vel_paddle_movement
 
-        # print(self.vel_world_frame[-1])
-        # print(self.points_world_frame[0])
+            # C01 @ dp1/dt, where dp1/dt is the paddle vel in canoe frame (same as paddle vel in paddle frame), which is
+            # only due to paddle rotation. For the simple paddle model here, dp1/dt = omega_paddle x length_of_paddle.
+            # For 2D, this simplifies to below
+            # todo find out why this is multiplied by C but above is C.T
+            paddle_vel_paddle_movement = (self.current_canoe_C @ (self.angular_vel * orthogonal(self.points_canoe_frame[i] - self.pose.point)).reshape(2,1)).reshape(1,2)
+            self.vel_world_frame[i] = canoe_vel_world_frame + paddle_vel_canoe_rotation + paddle_vel_paddle_movement
+            # self.vel_world_frame[i] = paddle_vel_paddle_movement
+        # print(paddle_vel_paddle_movement)
         return
 
     def updateWorldFrameTransform(self, new_canoe_C, new_canoe_point, new_canoe_vel):
@@ -128,8 +139,8 @@ class Boat:
         self.force_scale_w = 3/10000
 
         # paddle
-        self.paddle = Paddle(pose=Pose(0, self.SHAPE[1], pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100)
-        self.paddle2 = Paddle(pose=Pose(0, -self.SHAPE[1], -pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100)
+        self.paddle = Paddle(pose=Pose(0, self.SHAPE[1], pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=200)
+        self.paddle2 = Paddle(pose=Pose(0, -self.SHAPE[1], -pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=200)
         self.paddle_list = [self.paddle, self.paddle2]
 
     def setPose(self, pose):
@@ -177,7 +188,7 @@ class Boat:
         vel_damper = 0.90  # todo move it somewhere else, or replace this with a general method of damping
         # update paddle location
         for paddle in self.paddle_list:
-            paddle.twistPaddle()
+            paddle.twistPaddle(dt)
 
         # first update velocity from force
         total_forces, total_torque = self.getWrenches(vel_field)
@@ -225,7 +236,7 @@ def calculateOpposingWrenches(paddle_vel, points, distances, point_angles, main_
     :param vel_field: VelField
     :return: (forces, torque): forces = (2,) np array of forces, torque = float64 total torque
     """
-    paddle_opposing_wrench_scalar = 5E-3
+    paddle_opposing_wrench_scalar = 2E-2
     total_forces = np.zeros(2)
     total_torque = 0
     for i in range(points.shape[0]):
