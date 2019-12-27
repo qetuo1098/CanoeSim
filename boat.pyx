@@ -11,7 +11,7 @@ class Boat:
         self.tf = tf
         self.SHAPE = shape  # (a = major_axis, b = minor_axis)
         self.pose = copy(pose)  # pose of canoe. Note: DO NOT DIRECTLY EDIT self.pose
-        self.vel = copy(vel)  # linear and angular vel
+        self.vel = copy(vel)  # vel of canoe wrt world, written wrt to canoe frame
 
         # rotation matrix
         self.C = angleToC(pose.theta)
@@ -73,20 +73,26 @@ class Boat:
         total_force = np.array([0.0, 0.0])
         total_torque = 0.0
         boat_force, boat_torque = calculateWrenches(vel_field, self.tf.getTransformedPoses(self.canoe_frame, self.tf.root)[0].T, inverseH(self.canoe_frame.H))
-        # print(boat_force, boat_torque)
-        total_force += boat_force
-        total_torque += boat_torque
+        boat_vel_world_frame, boat_points_world_frame = self.tf.getTransformedVelocities(self.canoe_frame, self.tf.root)
+        boat_points_canoe_frame, _ = self.tf.getTransformedPoses(self.canoe_frame, self.canoe_frame)
+        # print(boat_points_canoe_frame)
+        boat_opposing_force, boat_opposing_torque = calculateOpposingWrenches(boat_vel_world_frame.T, boat_vel_world_frame.T, boat_points_canoe_frame.T, self.canoe_frame.H[:2, :2].T)
+        # print(boat_opposing_force, boat_opposing_torque)
+        total_force += (boat_force + boat_opposing_force)
+        total_torque += (boat_torque + boat_opposing_torque)
 
         for paddle in self.effective_paddle_list:
             paddle_force, paddle_torque = calculateWrenches(vel_field, self.tf.getTransformedPoses(paddle.frame, self.tf.root)[0].T, inverseH(self.canoe_frame.H))
-            paddle_vel_canoe_frame, paddle_points_canoe_frame = self.tf.getTransformedVelocities(paddle.frame, self.canoe_frame)
-            opposing_force, opposing_torque = calculateOpposingWrenches(paddle_vel_canoe_frame.T, paddle_points_canoe_frame.T)
-            total_force += (paddle_force + opposing_force)
-            total_torque += (paddle_torque + opposing_torque)
+            paddle_vel_world_frame, paddle_points_world_frame = self.tf.getTransformedVelocities(paddle.frame, self.tf.root)
+            paddle_points_canoe_frame, _ = self.tf.getTransformedPoses(paddle.frame, self.canoe_frame)
+            paddle_opposing_force, paddle_opposing_torque = calculateOpposingWrenches(paddle_vel_world_frame.T, paddle_points_world_frame.T, paddle_points_canoe_frame.T, self.canoe_frame.H[:2, :2].T)
+            total_force += (paddle_force + paddle_opposing_force)
+            total_torque += (paddle_torque + paddle_opposing_torque)
         return total_force, total_torque
 
     def stepForward(self, vel_field, dt):
-        vel_damper = 0.6  # todo move it somewhere else, or replace this with a general method of damping
+        vel_damper = 1  # todo move it somewhere else, or replace this with a general method of damping
+        # print("boat torque:",self.vel.theta)
         # update paddle location
         for paddle in self.all_paddle_list:
             paddle.twistPaddle(dt)
@@ -101,7 +107,7 @@ class Boat:
         self.vel.theta *= vel_damper
 
         # new: update tf
-        self.canoe_frame.v = self.vel.point.reshape(2, 1)
+        self.canoe_frame.v = self.canoe_frame.H[:2, :2] @ self.vel.point.reshape(2, 1)
         self.canoe_frame.w = self.vel.theta
 
         # then propel canoe forward
@@ -135,33 +141,30 @@ def calculateWrenches(vel_field, points_world, H_canoe):  # todo: refactor main_
         total_forces += v_canoe
         total_torque += torque
         # print("torque:", torque)
-
     return total_forces, total_torque
 
-def calculateOpposingWrenches(paddle_vel_canoe_frame, points_canoe_frame):  # todo: refactor
+def calculateOpposingWrenches(vel_world_frame, points_world_frame, points_canoe_frame, C_canoe):  # todo: refactor
     """
     Gets the current force and torque on the canoe in a given velocity field.
     Force: sums up the velocities at all points on the circumference (surface integral of velocities)
     Torque: sums up the cross product of the radii of all points on the circumference with velocities at these
     points (r x f)
     :param vel_field: VelField
-    :return: (forces, torque): forces = (2,) np array of forces, torque = float64 total torque
+    :return: (forces, torque): forces = (2,) np array of forces, torque = float64 total torque IN WORLD FRAME
     """
     paddle_opposing_wrench_scalar = 4E-2
     total_forces = np.zeros(2)
     total_torque = 0
+    # print(vel_world_frame.shape, points_world_frame.shape, points_canoe_frame.shape, C_canoe.shape)
     for i in range(points_canoe_frame.shape[0]):
-        point = points_canoe_frame[i]
-        forcex, forcey = paddle_vel_canoe_frame[i]
-        distance = np.linalg.norm(point)
-        point_angle = np.arctan2(point[1], point[0])
         # torque = radius x force = |r||f|sin(angle from r to f)
-        torque = distance * np.linalg.norm(np.array([forcex, forcey])) * sin(np.arctan2(forcey, forcex) - point_angle)
-        total_forces[0] += forcex
-        total_forces[1] += forcey
+        point_canoe_frame_written_wrt_world = C_canoe.T @ points_canoe_frame[i]
+        distance = np.linalg.norm(point_canoe_frame_written_wrt_world)  # distance to centre of canoe
+        point_angle = np.arctan2(point_canoe_frame_written_wrt_world[1], point_canoe_frame_written_wrt_world[0])
+        torque = distance * np.linalg.norm(vel_world_frame[i]) * sin(np.arctan2(vel_world_frame[i, 1], vel_world_frame[i, 0]) - point_angle)
+        total_forces += vel_world_frame[i]
         total_torque += torque
-
-    return (-paddle_opposing_wrench_scalar*total_forces, -paddle_opposing_wrench_scalar*total_torque)
+    return (-paddle_opposing_wrench_scalar * C_canoe @ total_forces, -paddle_opposing_wrench_scalar*total_torque)
 
 def propelVelField(vel_field, boat):
     """

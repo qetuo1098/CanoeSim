@@ -96,6 +96,7 @@ class TransformTree:
             # with more linked frames, just iterate as before
             # also need to calculate r12, r02, etc. (points) at each iteration by using H
             v = np.repeat(frame.v, points.shape[1], axis=1) + frame_C @ v + wcrossC(frame.w, frame_C) @ points[:-1, :]
+            # print(frame.id, frame.v)
             points = frame.H @ points
         # print(v, points[:-1, :])
         return v, points[:-1, :]
