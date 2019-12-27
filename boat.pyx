@@ -13,9 +13,7 @@ class Boat:
         self.pose = copy(pose)  # pose of canoe. Note: DO NOT DIRECTLY EDIT self.pose
         self.vel = copy(vel)  # vel of canoe wrt world, written wrt to canoe frame
 
-        # rotation matrix
-        self.C = angleToC(pose.theta)
-        self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)  # polygon to outline the boat
+        # self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)  # polygon to outline the boat
 
         # angles from 0 to 2pi, discretized st. the arc lengths between consecutive angles are the same
         self.discretized_angles = angles_in_ellipse(discretization, self.SHAPE[0], self.SHAPE[1])
@@ -34,15 +32,12 @@ class Boat:
 
         self.canoe_frame = self.tf.constructFrame(FrameID.BOAT, self.tf.root, self.pose.point, self.pose.theta, np.copy(self.default_circumference_points.T), angle_vectors)
 
-        # radius (distance from centre to point) of each circumference point (regardless of frame)
-        self.circumference_points_radii = sqrt(square(self.default_circumference_points[:, 0]) +
-                                               square(self.default_circumference_points[:, 1]))
-
         # force scaling from velocity to move the canoe. ToDo: make this scale common with the other forces (mouse)
         self.force_scale_v = 6/100
         self.force_scale_w = 6/10000
 
-        # paddle
+        # paddles
+        # handles are out of the water, paddles are in the water
         self.handleL = EndPaddle(pose=Pose(self.SHAPE[0], 0, 0), theta_max=(-pi/2, pi/2), length=5.0, discretization=25, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
         self.handleR = EndPaddle(pose=Pose(-self.SHAPE[0], 0, pi), theta_max=(-pi/2, pi/2), length=5.0, discretization=25, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
         self.paddleL = MiddlePaddle(pose=Pose(5, 0, pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=50, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
@@ -50,18 +45,21 @@ class Boat:
 
         self.effective_paddle_list = [self.paddleL, self.paddleR]  # "in the water", forces affect the canoe
         self.all_paddle_list = [self.handleL, self.handleR, self.paddleL, self.paddleR]  # both in and out of water
-        self.all_effective_frames = [self.canoe_frame, self.paddleL.frame, self.paddleR.frame]
+        self.all_effective_frames = [self.canoe_frame, self.paddleL.frame, self.paddleR.frame]  # all objects that affect the forces
+
         self.tf.renderTree()
 
     def setPose(self, pose):
         self.pose = copy(pose).wrapAngle()
-        self.C = angleToC(pose.theta)
-        self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)
+        # self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)
         return
 
     def moveByPose(self, delta_pose):
-        # move canoe by pose in a frame wrt to its current pose
-        self.setPose(self.pose + delta_pose)
+        """
+        Move canoe by delta_pose
+        :param delta_pose: difference of pose to be added, written wrt canoe frame
+        """
+        self.setPose(self.pose + delta_pose)  # add delta_pose to pose directly, since pose addition adds the delta_pose in the frame of the first pose
         self.tf.changeFrame(self.canoe_frame, self.tf.root, self.pose.point, self.pose.theta)
         return
 
@@ -71,6 +69,12 @@ class Boat:
         return
 
     def getWrenches(self, vel_field):
+        """
+        Get the total force and torque on both the canoe and paddles due to velocity field and the movement of the canoe
+        itself, by using calculateWrenches.
+        :param vel_field: Velocity field
+        :return: total_force (1x2), total torque (scalar)
+        """
         total_force = np.array([0.0, 0.0])
         total_torque = 0.0
         boat_points_world_frame, boat_normals_world_frame = self.tf.getTransformedPoses(self.canoe_frame, self.tf.root)
@@ -93,18 +97,21 @@ class Boat:
 
 
     def stepForward(self, vel_field, dt):
+        # steps forward in the canoe simulation. Called by demo.py
+
         # update paddle location
         for paddle in self.all_paddle_list:
             paddle.twistPaddle(dt)
 
-        # first update velocity from force
+        # update velocity from force
         total_forces, total_torque = self.getWrenches(vel_field)
+        # can add the forces to self.vel directly, as both are written wrt canoe frame
         self.vel.point += total_forces * self.force_scale_v
         self.vel.theta += total_torque * self.force_scale_w
 
-        # update tf
+        # update tf. For linear vel, need to transform the force into world frame before adding it to tf's v
         self.canoe_frame.v = self.canoe_frame.H[:2, :2] @ self.vel.point.reshape(2, 1)
-        self.canoe_frame.w = self.vel.theta
+        self.canoe_frame.w = self.vel.theta  # w doesn't matter as all frames have the same w direction
 
         # then propel canoe forward
         self.propelBoat(dt)
@@ -112,6 +119,21 @@ class Boat:
 
 
 def calculateWrenches(vel_field, vel_world_frame, points_world, normals_world_frame, points_canoe_frame, H_canoe):
+    """
+    Finds the total forces and torques exerted onto the object due to the velocity field and the object's movement.
+    For each point, dv = (velocity of point wrt world frame written wrt world frame) - velocity field at the point in
+    world frame), f = dv projected onto the point's normal, is now force of point in world frame written wrt world frame
+    (see convertVelToforce() in misc_methods.pyx)
+    torque = r(distance from point wrt to canoe, written wrt world frame) x f = |r||f|sin(angle from r to f)
+    total_forces, total_torque is by summing over the above over all object points
+    :param vel_field: velocity field
+    :param vel_world_frame: Nx2. velocity of points of interest wrt world frame, written wrt world frame
+    :param points_world: Nx2. positions of the points of interest wrt world frame
+    :param normals_world_frame: Nx2. normals of the points of interest wrt world frame
+    :param points_canoe_frame: Nx2. positions of the points of interest wrt canoe frame
+    :param H_canoe: homogeneous transformation from world to canoe (H @ p_world = p_canoe)
+    :return: (total_forces, total_torque). total_forces: 1x2, total_torque: scalar
+    """
     paddle_opposing_wrench_scalar = 8E-2
     total_forces = np.zeros(2)
     total_torque = 0
@@ -141,7 +163,10 @@ def calculateWrenches(vel_field, vel_world_frame, points_world, normals_world_fr
 
 def propelVelField(vel_field, boat):
     """
-    Change velocity field based on canoe's movement
+    Add velocity field feedback based on canoe's movement. For all points within the canoe and the effective paddles,
+    calculate the velocity of the object point wrt world frame written wrt world frame, subtract velocity field at the
+    object's position in world frame, and transform it to force (procedure is similar to calculateWrenches() above).
+    Then, add scaling*force to the velocity field to add the feedback back to the velocity field.
     :param vel_field: VelField
     :param boat: Boat
     :return: None

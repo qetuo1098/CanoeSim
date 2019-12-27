@@ -3,6 +3,8 @@ from boat import *
 class Controller:
     def __init__(self, boat):
         self.boat = boat
+
+        # open loop controller variables:
         self.counter = 0
         self.vel = 3
         self.interval = 20
@@ -17,6 +19,7 @@ class Controller:
         ))
 
     def getCommand(self):
+        # generates a command
         if self.counter < len(self.commands):
             command = self.commands[self.counter]
             self.counter += 1
@@ -25,6 +28,7 @@ class Controller:
         return command
 
     def control(self):
+        # call this method to send a command to the boat
         command = self.getCommand()
         self.boat.handleL.setAngularVel(command[0])
         self.boat.handleR.setAngularVel(command[1])

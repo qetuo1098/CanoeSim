@@ -25,12 +25,22 @@ def angleWrap(theta):
     return theta
 
 def angleToC(theta):
-    # get rotation matrix from theta
+    """
+    Construct a 2D rotation matrix from theta
+    :param theta: scalar
+    :return: 2x2 C
+    """
     cosx, sinx = np.cos(theta), np.sin(theta)
     C = np.array([[cosx, -sinx], [sinx, cosx]])
     return C
 
 def constructH(t, theta):
+    """
+    Construct a 2D homogeneous transformation matrix given t and theta: H = [C t; 0 1]
+    :param t: 2x1 or 1x2
+    :param theta: scalar
+    :return: 3x3 H
+    """
     H = np.zeros((3, 3))
     H[:2, :2] = angleToC(theta)
     H[:2, 2:3] = t.reshape(2, 1)
@@ -38,6 +48,12 @@ def constructH(t, theta):
     return H
 
 def inverseH(H):
+    """
+    Finds the inverse of a 2D homogeneous transformation matrix more efficiently than (but equivalent to) using
+    np.linalg.inv(H). For H = [C t; 0 1], inv(H) = [C.T -C.T@t; 0 1].
+    :param H: 3x3 to be inverted
+    :return: 3x3 inverse of H
+    """
     invH = np.empty((3, 3))
     invH[2, 2] = 1
     invH[:2, :2] = H[:2, :2].T
@@ -45,9 +61,11 @@ def inverseH(H):
     return invH
 
 def orthogonal(v):
+    # Finds the CW orthogonal vector to v. For 2D, CW orthogonal of [v0; v1] is [-v1; v0]
     return np.array([-v[1], v[0]])
 
 def close(a,b):
+    # True if a is close to b, False otherwise
     return abs(a-b) < 1E-7
 
 def wcrossC(w, C):
