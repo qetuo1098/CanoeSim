@@ -41,9 +41,8 @@ class Paddle:
         self.theta = min(self.THETA_MAX[1], max(self.THETA_MAX[0], self.theta + dtheta))
         self.frame.changeAngle(self.pose.theta + self.theta)
         if close(self.theta, self.THETA_MAX[0]) or close(self.theta, self.THETA_MAX[1]):
-            # saturate angular vel
+            # saturate theta
             self.setAngularVel(0)
-        # print(self.tf.getTransformedVelocities(self.frame, self.tf.root)[:, 0])
         return
 
 

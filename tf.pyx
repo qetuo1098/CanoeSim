@@ -83,7 +83,6 @@ class TransformTree:
         points = np.vstack((f1.pose_points, np.ones(f1.pose_points.shape[1])))
         v = np.zeros(f1.pose_points.shape, dtype=float64)
         for frame in f1.iter_path_reverse():
-            # print("v:",v)
             # using the current frame to calculate the v and points of the frame wrt the parent frame
             if frame == f0:
                 break
@@ -96,9 +95,7 @@ class TransformTree:
             # with more linked frames, just iterate as before
             # also need to calculate r12, r02, etc. (points) at each iteration by using H
             v = np.repeat(frame.v, points.shape[1], axis=1) + frame_C @ v + wcrossC(frame.w, frame_C) @ points[:-1, :]
-            # print(frame.id, frame.v)
             points = frame.H @ points
-        # print(v, points[:-1, :])
         return v, points[:-1, :]
 
     def renderTree(self):

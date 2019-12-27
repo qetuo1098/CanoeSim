@@ -3,6 +3,10 @@ from sklearn.preprocessing import normalize
 
 def bilinear_interp(d0, x, y):
     # bilinearly interpolate value at field d0[x,y], with x,y being floats
+    if x < 0:
+        x = 0
+    if y < 0:
+        y = 0
     x0, x1 = int(x), int(x) + 1
     y0, y1 = int(y), int(y) + 1
     s0, s1 = x1 - x, x - x0
@@ -60,4 +64,4 @@ def convertVelToForce(v, n):
     v = v.reshape(2)
     n = n.reshape(2)
     vdotn = v.dot(n)
-    return np.sign(vdotn) * np.abs(vdotn**2) * n
+    return np.sign(vdotn) * np.abs(vdotn**1) * n  # switch to v^2 when border is fixed

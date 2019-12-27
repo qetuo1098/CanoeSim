@@ -84,7 +84,7 @@ dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
 tf = TransformTree()
-boat = Boat(tf, (3, 9), 300, Pose(40, 40, 0), vel=Pose(0, 0, 0))  # n was 300
+boat = Boat(tf, (2, 6), 300, Pose(40, 40, 0), vel=Pose(0, 0, 0))  # n was 300
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
