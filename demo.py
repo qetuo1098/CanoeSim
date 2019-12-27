@@ -23,6 +23,7 @@ How to use this demo:
 
 import sys
 from solver_c import *
+from controller import *
 
 try:
     from OpenGL.GLUT import *
@@ -83,7 +84,9 @@ vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
-boat = Boat((3, 9), 300, Pose(40, 40, 0), vel=Pose(0, 0, 0))
+tf = TransformTree()
+boat = Boat(tf, (2, 6), 300, Pose(40, 10, 0), vel=Pose(2, 2, 0.5))  # n was 300
+controller = Controller(boat)
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
@@ -126,7 +129,7 @@ def draw_boat():
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
-    for point in boat.circumference_points:
+    for point in boat.tf.getTransformedPoses(boat.canoe_frame, boat.tf.root)[0].T:
         glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
     glEnd()
 
@@ -135,8 +138,8 @@ def draw_boat():
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
-    for paddle in boat.paddle_list:
-        for point in paddle.points_world_frame:
+    for paddle in boat.all_paddle_list:
+        for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
             glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()
 
@@ -239,16 +242,26 @@ def key_func(key, mouse_x, mouse_y):
     if key == b'e':
         boat.moveByPose(Pose(0, 0, -0.1))
     if key == b'1':
-        boat.paddle.angular_vel = 10.0
+        boat.handleL.setAngularVel(2.0)
     if key == b'2':
-        boat.paddle.angular_vel = -10.0
+        boat.handleL.setAngularVel(-2.0)
     if key == b'3':
-        boat.paddle2.angular_vel = 10.0
+        boat.handleR.setAngularVel(2.0)
     if key == b'4':
-        boat.paddle2.angular_vel = -10.0
-    if key not in (b'1', b'2', b'3', b'4'):
-        boat.paddle.angular_vel = 0
-        boat.paddle2.angular_vel = 0
+        boat.handleR.setAngularVel(-2.0)
+    if key == b'5':
+        boat.paddleL.setAngularVel(2.0)
+    if key == b'6':
+        boat.paddleL.setAngularVel(-2.0)
+    if key == b'7':
+        boat.paddleR.setAngularVel(2.0)
+    if key == b'8':
+        boat.paddleR.setAngularVel(-2.0)
+    if key not in (b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8'):
+        boat.handleL.setAngularVel(0)
+        boat.handleR.setAngularVel(0)
+        boat.paddleL.setAngularVel(0)
+        boat.paddleR.setAngularVel(0)
 
 
 def mouse_func(button, state, mouse_x, mouse_y):
@@ -290,6 +303,7 @@ def idle_func():
     dens_step(window.res, dens, dens_new_source, vel, diff, dt)
 
     counter += 1
+    controller.control()
     boat.stepForward(vel, dt)
     if counter % 5 == 0:
         print("Force: ", boat.getWrenches(vel))
