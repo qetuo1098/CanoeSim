@@ -23,6 +23,7 @@ How to use this demo:
 
 import sys
 from solver_c import *
+from controller import *
 
 try:
     from OpenGL.GLUT import *
@@ -84,7 +85,8 @@ dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
 tf = TransformTree()
-boat = Boat(tf, (2, 6), 300, Pose(40, 40, 0), vel=Pose(0, 0, 0))  # n was 300
+boat = Boat(tf, (2, 6), 300, Pose(40, 10, 0), vel=Pose(2, 2, 0.5))  # n was 300
+controller = Controller(boat)
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
@@ -301,6 +303,7 @@ def idle_func():
     dens_step(window.res, dens, dens_new_source, vel, diff, dt)
 
     counter += 1
+    controller.control()
     boat.stepForward(vel, dt)
     if counter % 5 == 0:
         print("Force: ", boat.getWrenches(vel))
