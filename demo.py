@@ -59,7 +59,7 @@ draw_style = DrawStyle.DYE_DENSITY
 
 dt = 0.05
 diff = 0.0
-visc = 0.01
+visc = 0.005
 force = 5.0
 source = 100.0
 
@@ -136,7 +136,7 @@ def draw_boat():
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
-    for paddle in boat.paddle_list:
+    for paddle in boat.all_paddle_list:
         for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
             glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()
@@ -240,16 +240,26 @@ def key_func(key, mouse_x, mouse_y):
     if key == b'e':
         boat.moveByPose(Pose(0, 0, -0.1))
     if key == b'1':
-        boat.paddle.setAngularVel(2.0)
+        boat.handleL.setAngularVel(2.0)
     if key == b'2':
-        boat.paddle.setAngularVel(-2.0)
+        boat.handleL.setAngularVel(-2.0)
     if key == b'3':
-        boat.paddle2.setAngularVel(2.0)
+        boat.handleR.setAngularVel(2.0)
     if key == b'4':
-        boat.paddle2.setAngularVel(-2.0)
-    if key not in (b'1', b'2', b'3', b'4'):
-        boat.paddle.setAngularVel(0)
-        boat.paddle2.setAngularVel(0)
+        boat.handleR.setAngularVel(-2.0)
+    if key == b'5':
+        boat.paddleL.setAngularVel(2.0)
+    if key == b'6':
+        boat.paddleL.setAngularVel(-2.0)
+    if key == b'7':
+        boat.paddleR.setAngularVel(2.0)
+    if key == b'8':
+        boat.paddleR.setAngularVel(-2.0)
+    if key not in (b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8'):
+        boat.handleL.setAngularVel(0)
+        boat.handleR.setAngularVel(0)
+        boat.paddleL.setAngularVel(0)
+        boat.paddleR.setAngularVel(0)
 
 
 def mouse_func(button, state, mouse_x, mouse_y):

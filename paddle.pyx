@@ -20,11 +20,8 @@ class Paddle:
         self.discretization_lengths = (self.LENGTH / (self.DISCRETIZATION + 1) * np.arange(0, self.DISCRETIZATION + 2))\
             .reshape(self.DISCRETIZATION + 2, 1)
 
-        unit_paddle = np.array([1.0, 0.0])
-        self.points_paddle_frame = self.discretization_lengths @ unit_paddle.reshape(1, 2)
-
         self.tf = tf  # reference
-        self.frame = tf.constructFrame(frame_id, parent_frame, pose.point, pose.theta, self.points_paddle_frame.T)  # new
+        self.frame = tf.constructFrame(frame_id, parent_frame, pose.point, pose.theta, pose_points=np.zeros((2, self.discretization_lengths.shape[0])))  # ToDo: if possible, avoid this purely virtual construction workaround
 
         self.point_radii = np.zeros(self.DISCRETIZATION + 2)
         self.point_angles = np.zeros(self.DISCRETIZATION + 2)
@@ -48,3 +45,20 @@ class Paddle:
             self.setAngularVel(0)
         # print(self.tf.getTransformedVelocities(self.frame, self.tf.root)[:, 0])
         return
+
+
+class EndPaddle(Paddle):
+    def __init__(self, pose, theta_max, length, discretization, frame_id, parent_frame, tf):
+        super(EndPaddle, self).__init__(pose, theta_max, length, discretization, frame_id, parent_frame, tf)
+        unit_paddle = np.array([1.0, 0.0])
+        self.points_paddle_frame = (self.discretization_lengths @ unit_paddle.reshape(1, 2)).T
+        self.frame.pose_points = self.points_paddle_frame
+
+
+class MiddlePaddle(Paddle):
+    def __init__(self, pose, theta_max, length, discretization, frame_id, parent_frame, tf):
+        super(MiddlePaddle, self).__init__(pose, theta_max, length, discretization, frame_id, parent_frame, tf)
+        unit_paddle = np.array([1.0, 0.0])
+        self.points_paddle_frame = (self.discretization_lengths @ unit_paddle.reshape(1, 2)).T
+        self.points_paddle_frame[0] -= self.LENGTH/2
+        self.frame.pose_points = self.points_paddle_frame

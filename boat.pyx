@@ -43,9 +43,13 @@ class Boat:
         self.force_scale_w = 3/10000
 
         # paddle
-        self.paddle = Paddle(pose=Pose(0, self.SHAPE[1], pi/2), theta_max=(-pi/2, pi/2), length=15.0, discretization=150, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
-        self.paddle2 = Paddle(pose=Pose(0, -self.SHAPE[1], -pi/2), theta_max=(-pi/2, pi/2), length=15.0, discretization=150, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
-        self.paddle_list = [self.paddle, self.paddle2]
+        self.handleL = EndPaddle(pose=Pose(self.SHAPE[0], 0, 0), theta_max=(-pi/2, pi/2), length=5.0, discretization=50, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
+        self.handleR = EndPaddle(pose=Pose(-self.SHAPE[0], 0, pi), theta_max=(-pi/2, pi/2), length=5.0, discretization=50, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
+        self.paddleL = MiddlePaddle(pose=Pose(5, 0, pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
+        self.paddleR = MiddlePaddle(pose=Pose(5, 0, pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=100, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
+
+        self.effective_paddle_list = [self.paddleL, self.paddleR]  # "in the water", forces affect the canoe
+        self.all_paddle_list = [self.handleL, self.handleR, self.paddleL, self.paddleR]  # both in and out of water
         self.tf.renderTree()
 
     def setPose(self, pose):
@@ -73,7 +77,7 @@ class Boat:
         total_force += boat_force
         total_torque += boat_torque
 
-        for paddle in self.paddle_list:
+        for paddle in self.effective_paddle_list:
             paddle_force, paddle_torque = calculateWrenches(vel_field, self.tf.getTransformedPoses(paddle.frame, self.tf.root)[0].T, inverseH(self.canoe_frame.H))
             paddle_vel_canoe_frame, paddle_points_canoe_frame = self.tf.getTransformedVelocities(paddle.frame, self.canoe_frame)
             opposing_force, opposing_torque = calculateOpposingWrenches(paddle_vel_canoe_frame.T, paddle_points_canoe_frame.T)
@@ -84,7 +88,7 @@ class Boat:
     def stepForward(self, vel_field, dt):
         vel_damper = 0.6  # todo move it somewhere else, or replace this with a general method of damping
         # update paddle location
-        for paddle in self.paddle_list:
+        for paddle in self.all_paddle_list:
             paddle.twistPaddle(dt)
 
         # first update velocity from force
@@ -168,20 +172,24 @@ def propelVelField(vel_field, boat):
     """
     scaling = 5E-5
     # canoe vel
-    boat_circumference_points = boat.tf.getTransformedPoses(boat.canoe_frame, boat.tf.root)[0]
+    boat_circumference_points = boat.tf.getTransformedPoses(boat.canoe_frame, boat.tf.root)[0].T
     for i in range(len(boat_circumference_points)):
         point = boat_circumference_points[i]
+        # print("point:",point)
         point_vel = boat.vel.point + boat.vel.theta * boat.circumference_points_radii[i]  # linear + angular vel
         vel_field.u[int(point[0]), int(point[1])] += scaling * point_vel[0]
         vel_field.v[int(point[0]), int(point[1])] += scaling * point_vel[1]
 
     # paddle vel
-    for paddle in boat.paddle_list:
+    for paddle in boat.effective_paddle_list:
         paddle_vel_world_frame, paddle_points_world_frame = boat.tf.getTransformedVelocities(paddle.frame, boat.tf.root)
-        paddle_vel_world_frame = paddle_points_world_frame.T
+        paddle_vel_world_frame = paddle_vel_world_frame.T
         paddle_points_world_frame = paddle_points_world_frame.T
+        # print("vel:",paddle_vel_world_frame)
+        # print(paddle.frame.id,paddle_points_world_frame)
         for i in range(len(paddle_points_world_frame)):
             point = paddle_points_world_frame[i]
             point_vel = paddle_vel_world_frame[i]
+            # print(point, point_vel)
             vel_field.u[int(point[0]), int(point[1])] += scaling * point_vel[0]
             vel_field.v[int(point[0]), int(point[1])] += scaling * point_vel[1]
