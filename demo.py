@@ -59,7 +59,7 @@ draw_style = DrawStyle.DYE_DENSITY
 
 dt = 0.05
 diff = 0.0
-visc = 0.005
+visc = 0.01
 force = 5.0
 source = 100.0
 
@@ -83,7 +83,8 @@ vel_new_source = copy(vel)
 dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
-boat = Boat((3, 9), 300, Pose(40, 40, 0), vel=Pose(0, 0, 0))
+tf = TransformTree()
+boat = Boat(tf, (3, 9), 300, Pose(40, 40, 0), vel=Pose(0, 0, 0))  # n was 300
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
@@ -126,7 +127,7 @@ def draw_boat():
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
-    for point in boat.circumference_points:
+    for point in boat.tf.getTransformedPoses(boat.canoe_frame, boat.tf.root)[0].T:
         glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
     glEnd()
 
@@ -136,7 +137,7 @@ def draw_boat():
 
     glBegin(GL_POINTS)
     for paddle in boat.paddle_list:
-        for point in paddle.points_world_frame:
+        for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
             glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()
 
@@ -239,16 +240,16 @@ def key_func(key, mouse_x, mouse_y):
     if key == b'e':
         boat.moveByPose(Pose(0, 0, -0.1))
     if key == b'1':
-        boat.paddle.angular_vel = 2.0
+        boat.paddle.setAngularVel(2.0)
     if key == b'2':
-        boat.paddle.angular_vel = -2.0
+        boat.paddle.setAngularVel(-2.0)
     if key == b'3':
-        boat.paddle2.angular_vel = 2.0
+        boat.paddle2.setAngularVel(2.0)
     if key == b'4':
-        boat.paddle2.angular_vel = -2.0
+        boat.paddle2.setAngularVel(-2.0)
     if key not in (b'1', b'2', b'3', b'4'):
-        boat.paddle.angular_vel = 0
-        boat.paddle2.angular_vel = 0
+        boat.paddle.setAngularVel(0)
+        boat.paddle2.setAngularVel(0)
 
 
 def mouse_func(button, state, mouse_x, mouse_y):

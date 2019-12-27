@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.preprocessing import normalize
 
 def bilinear_interp(d0, x, y):
     # bilinearly interpolate value at field d0[x,y], with x,y being floats
@@ -25,8 +26,26 @@ def angleToC(theta):
     C = np.array([[cosx, -sinx], [sinx, cosx]])
     return C
 
+def constructH(t, theta):
+    H = np.zeros((3, 3))
+    H[:2, :2] = angleToC(theta)
+    H[:2, 2:3] = t.reshape(2, 1)
+    H[2, 2] = 1
+    return H
+
+def inverseH(H):
+    invH = np.empty((3, 3))
+    invH[2, 2] = 1
+    invH[:2, :2] = H[:2, :2].T
+    invH[:2, 2:3] = -H[:2, :2].T @ H[:2, 2:3]
+    return invH
+
 def orthogonal(v):
     return np.array([-v[1], v[0]])
 
 def close(a,b):
     return abs(a-b) < 1E-7
+
+def wcrossC(w, C):
+    # for 2D, w cross C is [-wsin(theta), -wcos(theta); wcos(theta), -wsin(theta)]
+    return w * np.array([[-C[1, 0], -C[0, 0]], [C[0, 0], -C[1, 0]]])

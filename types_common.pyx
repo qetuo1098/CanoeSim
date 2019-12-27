@@ -51,7 +51,7 @@ class Twist:
 
 @dataclass
 class Pose:
-    point: np.array(dtype=float64)
+    point: np.array
     theta: float64
 
     def __init__(self, x=0.0, y=0.0, theta=0.0):
@@ -63,7 +63,7 @@ class Pose:
 
     def __iadd__(self, other):
         # the second vector is added to the first in the frame of the first
-        C = angleToC(-self.theta)
+        C = angleToC(self.theta)
         self.point += (C @ other.point.reshape((2,1))).ravel()
         self.theta += other.theta
         self.theta = angleWrap(self.theta)
