@@ -49,3 +49,15 @@ def close(a,b):
 def wcrossC(w, C):
     # for 2D, w cross C is [-wsin(theta), -wcos(theta); wcos(theta), -wsin(theta)]
     return w * np.array([[-C[1, 0], -C[0, 0]], [C[0, 0], -C[1, 0]]])
+
+def convertVelToForce(v, n):
+    """
+    Project v onto n, then square the magnitude. Formula: sign(v dot n) * (v dot n)^2 * n
+    :param v: velocity, 1x2
+    :param n: unit normal vector, 1x2
+    :return: f: force, 1x2
+    """
+    v = v.reshape(2)
+    n = n.reshape(2)
+    vdotn = v.dot(n)
+    return np.sign(vdotn) * np.abs(vdotn**2) * n
