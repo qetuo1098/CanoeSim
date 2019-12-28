@@ -4,6 +4,7 @@ from tf import *
 class Paddle:
     def __init__(self, pose, theta_max, length, discretization, frame_id, parent_frame, tf):
         """
+        Paddle object. Used for both paddles (in water) and handles (out of water)
         :param pose: pose of transformation from its parent frame to the paddle frame (written wrt parent frame)
         :param theta_max: min and max angle in paddle frame
         :param length: length of paddle

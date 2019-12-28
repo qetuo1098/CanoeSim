@@ -85,7 +85,7 @@ dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
 tf = TransformTree()
-boat = Boat(tf, (2, 6), 300, Pose(40, 10, 0), vel=Pose(2, 2, 0.5))  # n was 300
+boat = Boat(tf, (2, 6), 300, Pose(40, 10, 0), vel=Pose(0, 0, 0))  # n was 300
 controller = Controller(boat)
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
@@ -210,6 +210,7 @@ def get_from_UI(d, vel):
     if mouse_down[GLUT_LEFT_BUTTON]:
         vel.u[i, j] = force * (curr_mouse_pose.x - old_mouse_pose.x)
         vel.v[i, j] = force * (old_mouse_pose.y - curr_mouse_pose.y)
+        # print(vel.u[i, j], vel.v[i, j])
 
     if mouse_down[GLUT_RIGHT_BUTTON]:
         d[i, j] = source

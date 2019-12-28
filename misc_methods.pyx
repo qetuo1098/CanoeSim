@@ -82,4 +82,4 @@ def convertVelToForce(v, n):
     v = v.reshape(2)
     n = n.reshape(2)
     vdotn = v.dot(n)
-    return np.sign(vdotn) * np.abs(vdotn**1) * n  # switch to v^2 when border is fixed
+    return np.sign(vdotn) * np.abs(vdotn**2) * n  # switch to v^2 when border is fixed

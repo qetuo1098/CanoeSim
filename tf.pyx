@@ -3,6 +3,10 @@ from anytree import Node, NodeMixin, RenderTree
 from misc_methods import *
 
 class FrameID(enum.Enum):
+    """
+    Id of frames. Each frame has a unique ID.
+    Only used to manually identify frames through printing out the frame.id for debugging.
+    """
     WORLD = enum.auto()
     BOAT = enum.auto()
     PADDLE_L1 = enum.auto()
@@ -13,6 +17,8 @@ class FrameID(enum.Enum):
 
 class Frame(Node):
     """
+    A frame within the transform tree. Contains transformation wrt its parent frame, v wrt its parent frame, points
+    within the frame that are stationary wrt this frame, and the surface normals of these points
     id: id of frame (in class FrameID)
     H: (3x3) homogeneous matrix of this frame wrt to its parent frame, written wrt parent frame
     pose_points: (2xN) points of this frame
@@ -136,4 +142,6 @@ class TransformTree:
         return v, points[:-1, :]
 
     def renderTree(self):
+        # print out the entire transform tree
+        # starting from the root and going depth-first down the tree, print the frame and all variables within each frame
         print(RenderTree(self.root))

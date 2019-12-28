@@ -1,10 +1,24 @@
 from boat import *
 
 class Controller:
+    """
+    Drives the canoe to achieve a desired goal.
+    Generates commands using information from the boat object, and operates the paddles by changing their angular velocities.
+    """
     def __init__(self, boat):
         self.boat = boat
 
-        # open loop controller variables:
+    def getCommand(self):
+        return np.zeros(4)
+
+    def control(self):
+        pass
+
+
+class OpenLoopController(Controller):
+    def __init__(self, boat):
+        super(OpenLoopController, self).__init__(boat)
+        # open loop controller variables: hardcoded control commands
         self.counter = 0
         self.vel = 3
         self.interval = 20
