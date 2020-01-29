@@ -56,7 +56,7 @@ class Window:
         self.size = self.res + 2
 
 # main code
-draw_style = DrawStyle.DYE_DENSITY
+draw_style = DrawStyle.FLOW_VELOCITY
 
 dt = 0.05
 diff = 0.0
@@ -85,8 +85,13 @@ dens = np.zeros((window.size, window.size), float64)  # density
 dens_new_source = np.zeros((window.size, window.size), float64)
 
 tf = TransformTree()
-boat = Boat(tf, (2, 6), 300, Pose(40, 10, 0), vel=Pose(0, 0, 0))  # n was 300
-controller = Controller(boat)
+boat = Boat(tf, (1, 5), 300/4, Pose(30, 15, 0), vel=Pose(0, 0, 0))  # n was 300
+print(sys.argv)
+
+if len(sys.argv) > 1 and sys.argv[1] == '1':
+    controller = OpenLoopController(boat)
+else:
+    controller = EmptyController(boat)
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
@@ -300,6 +305,12 @@ def idle_func():
     global boat, counter
 
     get_from_UI(dens_new_source, vel_new_source)
+
+    # add an artificial velocity source
+    # for i in range(0, 10):
+    #     vel_new_source.v[30+i, 20] = 0.5
+    #     vel_new_source.u[30+i, 20] = 0.5
+
     vel_step(window.res, vel, vel_new_source, visc, dt, boat)
     dens_step(window.res, dens, dens_new_source, vel, diff, dt)
 
@@ -308,6 +319,7 @@ def idle_func():
     boat.stepForward(vel, dt)
     if counter % 5 == 0:
         print("Force: ", boat.getWrenches(vel))
+        print("Vel:", boat.vel.point, boat.vel.theta)
     glutPostRedisplay()
 
 

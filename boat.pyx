@@ -13,8 +13,8 @@ class Boat:
         self.pose = copy(pose)  # pose of canoe. Note: DO NOT DIRECTLY EDIT self.pose
         self.vel = copy(vel)  # vel of canoe wrt world, written wrt to canoe frame
 
-        self.force_saturation = 100
-        self.torque_saturation = 1000
+        self.force_saturation = 300
+        self.torque_saturation = 3000
 
         # self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)  # polygon to outline the boat
 
@@ -36,15 +36,15 @@ class Boat:
         self.canoe_frame = self.tf.constructFrame(FrameID.BOAT, self.tf.root, self.pose.point, self.pose.theta, np.copy(self.default_circumference_points.T), angle_vectors)
 
         # force scaling from velocity to move the canoe. ToDo: make this scale common with the other forces (mouse)
-        self.force_scale_v = 6/100
-        self.force_scale_w = 9/10000
+        self.force_scale_v = 4*12/100
+        self.force_scale_w = 4*36/10000
 
         # paddles
         # handles are out of the water, paddles are in the water
-        self.handleL = EndPaddle(pose=Pose(self.SHAPE[0], 0, 0), theta_max=(-pi/2, pi/2), length=5.0, discretization=25, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
-        self.handleR = EndPaddle(pose=Pose(-self.SHAPE[0], 0, pi), theta_max=(-pi/2, pi/2), length=5.0, discretization=25, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
-        self.paddleL = MiddlePaddle(pose=Pose(5, 0, pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=50, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
-        self.paddleR = MiddlePaddle(pose=Pose(5, 0, pi/2), theta_max=(-pi/2, pi/2), length=10.0, discretization=50, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
+        self.handleL = EndPaddle(pose=Pose(0, self.SHAPE[1]-1, 0), theta_max=(-pi/4, pi+pi/4), length=1.25, discretization=12, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
+        self.handleR = EndPaddle(pose=Pose(0, -self.SHAPE[1]+1, pi), theta_max=(-pi/4, pi+pi/4), length=1.25, discretization=12, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
+        self.paddleL = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), length=5, discretization=25, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
+        self.paddleR = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), length=5, discretization=25, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
 
         self.effective_paddle_list = [self.paddleL, self.paddleR]  # "in the water", forces affect the canoe
         self.all_paddle_list = [self.handleL, self.handleR, self.paddleL, self.paddleR]  # both in and out of water
@@ -96,6 +96,8 @@ class Boat:
                                                          inverseH(self.canoe_frame.H))
             total_force += paddle_force
             total_torque += paddle_torque
+
+        total_force, total_torque = saturateWrench(total_force, total_torque, self.force_saturation, self.torque_saturation)
         return total_force, total_torque
 
 
@@ -115,14 +117,6 @@ class Boat:
         # update tf. For linear vel, need to transform the force into world frame before adding it to tf's v
         self.canoe_frame.v = self.canoe_frame.H[:2, :2] @ self.vel.point.reshape(2, 1)
         self.canoe_frame.w = self.vel.theta  # w doesn't matter as all frames have the same w direction
-
-        # if going out of bounds, reflect velocity
-        # for frame in self.all_effective_frames:
-        #     points_world, _ = self.tf.getTransformedPoses(frame, self.tf.root)
-        #     within_zero = points_world > 0
-        #     within_bounds = points_world > np.array([vel_field.sizex, vel_field.sizey]).reshape(2, 1)
-        #     if not np.all(within_zero[0]):
-        #         self.canoe_frame.v
 
         # then propel canoe forward
         self.propelBoat(dt)
@@ -145,7 +139,7 @@ class Boat:
         :param H_canoe: homogeneous transformation from world to canoe (H @ p_world = p_canoe)
         :return: (total_forces, total_torque). total_forces: 1x2, total_torque: scalar
         """
-        paddle_opposing_wrench_scalar = 8E-2
+        paddle_opposing_wrench_scalar = 1E-2
         total_forces = np.zeros(2)
         total_torque = 0
         C_canoe = H_canoe[:2, :2]
@@ -156,14 +150,15 @@ class Boat:
         effect = False
         for i in range(points_world.shape[0]):
             index = tuple(points_world[i])
-            if not effect and (index[0] <= 3 or index[0] >= vel_field.sizex-3 or index[1] <= 3 or index[1] >= vel_field.sizey-3):
-                v_world = -vel_world_frame[i]*20
-                print("effect:", index, vel_field.sizex, vel_field.sizey, v_world)
-                effect = True
-                total_forces = v_world
-                total_torque = 0.1 * distances_wrt_canoe[i] * np.linalg.norm(v_world) * \
-                         sin(np.arctan2(v_world[1], v_world[0]) - angles_wrt_canoe[i])
-                break
+            if not effect and (index[0] <= 0 or index[0] >= vel_field.sizex or index[1] <= 0 or index[1] >= vel_field.sizey):
+                # v_world = -vel_world_frame[i]*20
+                # print("effect:", index, vel_field.sizex, vel_field.sizey, v_world)
+                # effect = True
+                # total_forces = v_world
+                # total_torque = 0.1 * distances_wrt_canoe[i] * np.linalg.norm(v_world) * \
+                #          sin(np.arctan2(v_world[1], v_world[0]) - angles_wrt_canoe[i])
+                # break
+                exit("out of frame")
             else:
                 v_world = np.array([bilinear_interp(vel_field.u, index[0], index[1]), bilinear_interp(vel_field.v, index[0], index[1])]) - vel_world_frame[i] * paddle_opposing_wrench_scalar
                 f_world = convertVelToForce(v_world, normals_world_frame[i])
@@ -174,13 +169,6 @@ class Boat:
             total_forces += f_world
             total_torque += torque
         total_forces = C_canoe @ total_forces
-        if np.linalg.norm(total_forces) > self.force_saturation:
-            print("force saturated:", total_forces)
-            total_forces *= (self.force_saturation / np.linalg.norm(total_forces))
-        if abs(total_torque) > self.torque_saturation:
-            print("torque saturated:", total_torque)
-            total_torque = self.torque_saturation * np.sign(total_torque)
-        # print("total forces:", total_forces, total_torque)
         return total_forces, total_torque
 
 

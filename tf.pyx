@@ -101,7 +101,9 @@ class TransformTree:
 
     def getTransformedPoses(self, f1, f0):
         """
-        Get positions of points and the normals of points in f1 wrt f0 written in the frame of f0
+        Get positions of points and the normals of points in f1 wrt f0 written in the frame of f0.
+        For points, transform using the full homogeneous matrix.
+        For normal angle vectors, transform with only the rotation matrix
         :param f1: frame of which we wish to find the positions/normals of the points wrt f0
         :param f0: frame, of which we wish to find f1 points/normals wrt to and written wrt to. f0 must be an ancestor of f1
         :return: (points, normals). points: 2xN. normals: 2xN

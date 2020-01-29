@@ -83,3 +83,12 @@ def convertVelToForce(v, n):
     n = n.reshape(2)
     vdotn = v.dot(n)
     return np.sign(vdotn) * np.abs(vdotn**2) * n  # switch to v^2 when border is fixed
+
+def saturateWrench(force, torque, force_saturation, torque_saturation):
+    if np.linalg.norm(force) > force_saturation:
+        print("force saturated:", force)
+        force *= (force_saturation / np.linalg.norm(force))
+    if abs(torque) > torque_saturation:
+        print("torque saturated:", torque)
+        torque = torque_saturation * np.sign(torque)
+    return force, torque
