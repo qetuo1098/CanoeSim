@@ -46,9 +46,10 @@ class Boat:
         self.paddleL = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), length=5, discretization=25, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
         self.paddleR = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), length=5, discretization=25, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
 
-        self.effective_paddle_list = [self.paddleL, self.paddleR]  # "in the water", forces affect the canoe
-        self.all_paddle_list = [self.handleL, self.handleR, self.paddleL, self.paddleR]  # both in and out of water
-        self.all_effective_frames = [self.canoe_frame, self.paddleL.frame, self.paddleR.frame]  # all objects that affect the forces
+        self.effective_paddle_set = {self.paddleL, self.paddleR}  # "in the water", forces affect the canoe
+        self.all_paddle_set = {self.handleL, self.handleR, self.paddleL, self.paddleR}  # both in and out of water
+        self.all_effective_frames = {self.canoe_frame, self.paddleL.frame, self.paddleR.frame}  # all objects that affect the forces
+        self.all_frames = {self.canoe_frame} | {obj.frame for obj in self.all_paddle_set}
 
         self.tf.renderTree()
 
@@ -87,7 +88,7 @@ class Boat:
         total_force += boat_force
         total_torque += boat_torque
 
-        for paddle in self.effective_paddle_list:
+        for paddle in self.effective_paddle_set:
             paddle_points_world_frame, paddle_normals_world_frame = self.tf.getTransformedPoses(paddle.frame, self.tf.root)
             paddle_vel_world_frame, paddle_points_world_frame = self.tf.getTransformedVelocities(paddle.frame, self.tf.root)
             paddle_points_canoe_frame, _ = self.tf.getTransformedPoses(paddle.frame, self.canoe_frame)
@@ -105,7 +106,7 @@ class Boat:
         # steps forward in the canoe simulation. Called by demo.py
 
         # update paddle location
-        for paddle in self.all_paddle_list:
+        for paddle in self.all_paddle_set:
             paddle.twistPaddle(dt)
 
         # update velocity from force
@@ -120,7 +121,9 @@ class Boat:
 
         # then propel canoe forward
         self.propelBoat(dt)
-        return
+
+        in_bounds = self.checkInBounds(vel_field)
+        return in_bounds
 
 
     def calculateWrenches(self, vel_field, vel_world_frame, points_world, normals_world_frame, points_canoe_frame, H_canoe):
@@ -147,22 +150,11 @@ class Boat:
         distances_wrt_canoe = np.linalg.norm(points_canoe_frame_written_wrt_world, axis=1)
         angles_wrt_canoe = np.arctan2(points_canoe_frame_written_wrt_world[:, 1], points_canoe_frame_written_wrt_world[:, 0])
         # print(vel_world_frame)
-        effect = False
         for i in range(points_world.shape[0]):
             index = tuple(points_world[i])
-            if not effect and (index[0] <= 0 or index[0] >= vel_field.sizex or index[1] <= 0 or index[1] >= vel_field.sizey):
-                # v_world = -vel_world_frame[i]*20
-                # print("effect:", index, vel_field.sizex, vel_field.sizey, v_world)
-                # effect = True
-                # total_forces = v_world
-                # total_torque = 0.1 * distances_wrt_canoe[i] * np.linalg.norm(v_world) * \
-                #          sin(np.arctan2(v_world[1], v_world[0]) - angles_wrt_canoe[i])
-                # break
-                exit("out of frame")
-            else:
-                v_world = np.array([bilinear_interp(vel_field.u, index[0], index[1]), bilinear_interp(vel_field.v, index[0], index[1])]) - vel_world_frame[i] * paddle_opposing_wrench_scalar
-                f_world = convertVelToForce(v_world, normals_world_frame[i])
-                # print("v_world:", np.array([bilinear_interp(vel_field.u, index[0], index[1]), bilinear_interp(vel_field.v, index[0], index[1])]), vel_world_frame[i])
+            v_world = np.array([bilinear_interp(vel_field.u, index[0], index[1]), bilinear_interp(vel_field.v, index[0], index[1])]) - vel_world_frame[i] * paddle_opposing_wrench_scalar
+            f_world = convertVelToForce(v_world, normals_world_frame[i])
+            # print("v_world:", np.array([bilinear_interp(vel_field.u, index[0], index[1]), bilinear_interp(vel_field.v, index[0], index[1])]), vel_world_frame[i])
             # torque = radius x force = |r||f|sin(angle from r to f)
             torque = distances_wrt_canoe[i] * np.linalg.norm(f_world) * \
                      sin(np.arctan2(f_world[1], f_world[0]) - angles_wrt_canoe[i])
@@ -170,6 +162,14 @@ class Boat:
             total_torque += torque
         total_forces = C_canoe @ total_forces
         return total_forces, total_torque
+
+    def checkInBounds(self, vel_field):
+        for frame in self.all_frames:
+            obj_points_world_frame, _ = self.tf.getTransformedPoses(frame, self.tf.root)
+            for index in obj_points_world_frame:
+                if (index[0] <= 0 or index[0] >= vel_field.sizex-4 or index[1] <= 0 or index[1] >= vel_field.sizey-4):
+                    return False
+        return True
 
 
 def propelVelField(vel_field, boat):

@@ -95,6 +95,7 @@ else:
 # boat = Boat((3, 9), 300, Pose(40, 40, 7*pi/6))
 counter = 0
 
+in_bounds = True
 
 def clear_data():
     """clear_data."""
@@ -143,7 +144,7 @@ def draw_boat():
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
-    for paddle in boat.all_paddle_list:
+    for paddle in boat.all_paddle_set:
         for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
             glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()
@@ -302,7 +303,10 @@ def idle_func():
     """idle_func."""
 
     global dens, dens_new_source, window, visc, dt, diff, vel, vel_new_source
-    global boat, counter
+    global boat, counter, in_bounds
+
+    if not in_bounds:
+        exit("out of frame")
 
     get_from_UI(dens_new_source, vel_new_source)
 
@@ -316,7 +320,8 @@ def idle_func():
 
     counter += 1
     controller.control()
-    boat.stepForward(vel, dt)
+    in_bounds = boat.stepForward(vel, dt)
+    print(in_bounds)
     if counter % 5 == 0:
         print("Force: ", boat.getWrenches(vel))
         print("Vel:", boat.vel.point, boat.vel.theta)
