@@ -3,7 +3,7 @@ import enum
 from dataclasses import dataclass, field
 from copy import copy
 from numpy import sin, cos, square, sqrt, isclose
-from numpy import float64
+from numpy import float64, uint16
 from misc_methods import *
 
 pi = np.pi

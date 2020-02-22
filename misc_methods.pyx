@@ -17,7 +17,7 @@ def bilinear_interp(d0, x, y):
     return b
 
 def angleWrap(theta):
-    # wraps to between [0, 2pi]
+    # wraps to between [-pi, pi]
     while theta < -np.pi:
         theta += 2*np.pi
     while theta > np.pi:
@@ -84,11 +84,24 @@ def convertVelToForce(v, n):
     vdotn = v.dot(n)
     return np.sign(vdotn) * np.abs(vdotn**2) * n  # switch to v^2 when border is fixed
 
-def saturateWrench(force, torque, force_saturation, torque_saturation):
+def saturateWrench(force, torque, force_saturation, torque_saturation, prints=False):
     if np.linalg.norm(force) > force_saturation:
-        print("force saturated:", force)
+        if prints:
+            print("force saturated:", force)
         force *= (force_saturation / np.linalg.norm(force))
     if abs(torque) > torque_saturation:
-        print("torque saturated:", torque)
+        if prints:
+            print("torque saturated:", torque)
         torque = torque_saturation * np.sign(torque)
     return force, torque
+
+def saturateVel(vel, linear_vel_saturation, angular_vel_saturation, prints=False):
+    if np.linalg.norm(vel.point) > linear_vel_saturation:
+        if prints:
+            print("vel saturated:", vel.point)
+        vel.point *= (linear_vel_saturation / np.linalg.norm(vel.point))
+    if abs(vel.theta) > angular_vel_saturation:
+        if prints:
+            print("angular vel saturated:", vel.theta)
+        vel.theta = angular_vel_saturation * np.sign(vel.theta)
+    return vel

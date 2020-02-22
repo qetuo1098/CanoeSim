@@ -4,3 +4,4 @@
 *.o
 *.c
 __pycache__/
+.vscode/*

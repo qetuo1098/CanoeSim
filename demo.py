@@ -144,7 +144,7 @@ def draw_boat():
     glPointSize(5.0)
 
     glBegin(GL_POINTS)
-    for paddle in boat.all_paddle_set:
+    for paddle in boat.all_paddle_list:
         for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
             glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()

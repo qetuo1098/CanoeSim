@@ -2,7 +2,7 @@ from types_common import *
 from tf import *
 
 class Paddle:
-    def __init__(self, pose, theta_max, length, discretization, frame_id, parent_frame, tf):
+    def __init__(self, pose, theta_max, angular_vel_max, length, discretization, frame_id, parent_frame, tf):
         """
         Paddle object. Used for both paddles (in water) and handles (out of water)
         :param pose: pose of transformation from its parent frame to the paddle frame (written wrt parent frame)
@@ -18,6 +18,7 @@ class Paddle:
         self.DISCRETIZATION = discretization
         self.theta = 0  # current angle of the paddle wrt its neutral position
         self.angular_vel = 0
+        self.ANGULAR_VEL_MAX = angular_vel_max
 
         # make discretization lengths, a column vector from 0 to self.length
         self.discretization_lengths = (self.LENGTH / (self.DISCRETIZATION + 1) * np.arange(0, self.DISCRETIZATION + 2))\
@@ -33,6 +34,8 @@ class Paddle:
 
     def setAngularVel(self, w):
         # change the angular velocity of the paddle. Used to control paddle movements
+        if abs(w) > self.ANGULAR_VEL_MAX:
+            w = self.ANGULAR_VEL_MAX * np.sign(w)
         self.angular_vel = w
         self.frame.w = w
 
@@ -51,8 +54,8 @@ class Paddle:
 class EndPaddle(Paddle):
     # paddle attached to its parent at one end of the paddle
     # paddle points go from (0, 0) to (length, 0) in the paddle frame
-    def __init__(self, pose, theta_max, length, discretization, frame_id, parent_frame, tf):
-        super(EndPaddle, self).__init__(pose, theta_max, length, discretization, frame_id, parent_frame, tf)
+    def __init__(self, pose, theta_max, angular_vel_max, length, discretization, frame_id, parent_frame, tf):
+        super(EndPaddle, self).__init__(pose, theta_max, angular_vel_max, length, discretization, frame_id, parent_frame, tf)
         unit_paddle = np.array([1.0, 0.0])
         self.points_paddle_frame = (self.discretization_lengths @ unit_paddle.reshape(1, 2)).T
         self.frame.pose_points = self.points_paddle_frame
@@ -61,8 +64,8 @@ class EndPaddle(Paddle):
 class MiddlePaddle(Paddle):
     # paddle attached to its parent at the middle of the paddle
     # paddle points go from (-length/2, 0) to (length/2, 0) in the paddle frame
-    def __init__(self, pose, theta_max, length, discretization, frame_id, parent_frame, tf):
-        super(MiddlePaddle, self).__init__(pose, theta_max, length, discretization, frame_id, parent_frame, tf)
+    def __init__(self, pose, theta_max, angular_vel_max, length, discretization, frame_id, parent_frame, tf):
+        super(MiddlePaddle, self).__init__(pose, theta_max, angular_vel_max, length, discretization, frame_id, parent_frame, tf)
         unit_paddle = np.array([1.0, 0.0])
         self.points_paddle_frame = (self.discretization_lengths @ unit_paddle.reshape(1, 2)).T
 

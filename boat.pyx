@@ -16,6 +16,9 @@ class Boat:
         self.force_saturation = 300
         self.torque_saturation = 3000
 
+        self.linear_vel_saturation = 25
+        self.angular_vel_saturation = 4.5
+
         # self.patch = patches.Ellipse(pose.point, self.SHAPE[0], self.SHAPE[1], pose.theta)  # polygon to outline the boat
 
         # angles from 0 to 2pi, discretized st. the arc lengths between consecutive angles are the same
@@ -36,22 +39,22 @@ class Boat:
         self.canoe_frame = self.tf.constructFrame(FrameID.BOAT, self.tf.root, self.pose.point, self.pose.theta, np.copy(self.default_circumference_points.T), angle_vectors)
 
         # force scaling from velocity to move the canoe. ToDo: make this scale common with the other forces (mouse)
-        self.force_scale_v = 4*12/100
-        self.force_scale_w = 4*36/10000
+        self.force_scale_v = 8*12/100
+        self.force_scale_w = 8*36/10000
 
         # paddles
         # handles are out of the water, paddles are in the water
-        self.handleL = EndPaddle(pose=Pose(0, self.SHAPE[1]-1, 0), theta_max=(-pi/4, pi+pi/4), length=1.25, discretization=12, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
-        self.handleR = EndPaddle(pose=Pose(0, -self.SHAPE[1]+1, pi), theta_max=(-pi/4, pi+pi/4), length=1.25, discretization=12, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
-        self.paddleL = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), length=5, discretization=25, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
-        self.paddleR = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), length=5, discretization=25, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
+        self.handleL = EndPaddle(pose=Pose(0, self.SHAPE[1]-1, 0), theta_max=(-pi/4, pi+pi/4), angular_vel_max=6, length=1.25, discretization=12, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
+        self.handleR = EndPaddle(pose=Pose(0, -self.SHAPE[1]+1, pi), theta_max=(-pi/4, pi+pi/4), angular_vel_max=6, length=1.25, discretization=12, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
+        self.paddleL = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), angular_vel_max=6, length=5, discretization=25, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
+        self.paddleR = MiddlePaddle(pose=Pose(1.25, 0, pi/2), theta_max=(-pi/2, pi/2), angular_vel_max=6, length=5, discretization=25, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
 
         self.effective_paddle_set = {self.paddleL, self.paddleR}  # "in the water", forces affect the canoe
-        self.all_paddle_set = {self.handleL, self.handleR, self.paddleL, self.paddleR}  # both in and out of water
+        self.all_paddle_list = [self.handleL, self.handleR, self.paddleL, self.paddleR]  # both in and out of water
         self.all_effective_frames = {self.canoe_frame, self.paddleL.frame, self.paddleR.frame}  # all objects that affect the forces
-        self.all_frames = {self.canoe_frame} | {obj.frame for obj in self.all_paddle_set}
+        self.all_frames = {self.canoe_frame} | {obj.frame for obj in self.all_paddle_list}
 
-        self.tf.renderTree()
+        # self.tf.renderTree()
 
     def setPose(self, pose):
         self.pose = copy(pose).wrapAngle()
@@ -106,7 +109,7 @@ class Boat:
         # steps forward in the canoe simulation. Called by demo.py
 
         # update paddle location
-        for paddle in self.all_paddle_set:
+        for paddle in self.all_paddle_list:
             paddle.twistPaddle(dt)
 
         # update velocity from force
@@ -114,6 +117,9 @@ class Boat:
         # can add the forces to self.vel directly, as both are written wrt canoe frame
         self.vel.point += total_forces * self.force_scale_v
         self.vel.theta += total_torque * self.force_scale_w
+
+        # saturate velocity
+        self.vel = saturateVel(self.vel, self.linear_vel_saturation, self.angular_vel_saturation)
 
         # update tf. For linear vel, need to transform the force into world frame before adding it to tf's v
         self.canoe_frame.v = self.canoe_frame.H[:2, :2] @ self.vel.point.reshape(2, 1)
@@ -166,8 +172,11 @@ class Boat:
     def checkInBounds(self, vel_field):
         for frame in self.all_frames:
             obj_points_world_frame, _ = self.tf.getTransformedPoses(frame, self.tf.root)
+            obj_points_world_frame = obj_points_world_frame.T
             for index in obj_points_world_frame:
-                if (index[0] <= 0 or index[0] >= vel_field.sizex-4 or index[1] <= 0 or index[1] >= vel_field.sizey-4):
+                if (index[0] <= 0 or index[0] >= vel_field.sizex-2 or index[1] <= 0 or index[1] >= vel_field.sizey-2):
+                    print("not in bounds:",frame.id, frame.H)
+                    print(index, vel_field.sizex, vel_field.sizey)
                     return False
         return True
 
