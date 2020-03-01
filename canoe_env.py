@@ -4,6 +4,7 @@ from controller import *
 from random import uniform
 import gym
 from gym import spaces
+import render_opengl as gl
 
 # main code
 @dataclass
@@ -20,6 +21,7 @@ class CanoeEnvParams:
     canoe_shape: tuple = (1., 5.)
     canoe_init_pose: Pose = Pose(30., 15., 0.)
     canoe_init_vel: Pose = Pose(0, 0, 0)
+    stay_alive_reward: float64 = 1.2 * (window_size**2 + reward_factor * np.pi)
 
 
 class ConversionFactor:
@@ -34,10 +36,10 @@ class ConversionFactor:
 
 
 class CanoeEnv(gym.Env):
-    metadata = {'render.modes': ['state', 'tf']}
-    def __init__(self):
+    metadata = {'render.modes': ['state', 'tf', 'opengl']}
+    def __init__(self, use_opengl=False):
         super(CanoeEnv, self).__init__()
-
+        self.use_opengl = use_opengl
         self.params = CanoeEnvParams()
         self.reset()
 
@@ -62,6 +64,8 @@ class CanoeEnv(gym.Env):
         self.observation_space = spaces.Box(low=obs_range[0], high=obs_range[1], shape=(4+len(self.paddle_theta_factor),), dtype=float64)
         self.action_space = spaces.Box(low=action_range[0], high=action_range[1], shape=(len(self.paddle_action_factor),), dtype=float64)
 
+        if use_opengl:
+            self.gl_window = gl.open_glut_window()
         return
 
     def reset(self):
@@ -99,7 +103,7 @@ class CanoeEnv(gym.Env):
         return obs
     
     def _calculateReward(self):
-        reward = -np.linalg.norm(self.boat.pose.point - self.params.target_pose.point) - self.params.reward_factor * abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))
+        reward = self.params.stay_alive_reward -np.linalg.norm(self.boat.pose.point - self.params.target_pose.point) - self.params.reward_factor * abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))
         return reward
 
     def step(self, action):
@@ -130,15 +134,20 @@ class CanoeEnv(gym.Env):
             print("Done:", self.done)
         elif mode == 'tf':
             print(self.tf.renderTree())
+        elif mode == 'opengl':
+            assert self.use_opengl
+            gl.display_func(self.gl_window, self.vel, self.boat)
 
 
 if __name__ == "__main__":
-    canoe_env = CanoeEnv()
+    canoe_env = CanoeEnv(use_opengl=True)
     done = False
     i = 0
     while not done:
         action = canoe_env.action_space.sample()
         (obs, reward, done, info) = canoe_env.step(action)
+        if i < 100:
+            canoe_env.render('opengl')
         print(reward)
         if i > 500:
             canoe_env.reset()
