@@ -24,7 +24,8 @@ How to use this demo:
 import sys
 from solver_c import *
 from controller import *
-
+import render_opengl as gl
+from render_opengl import DrawStyle, Window
 try:
     from OpenGL.GLUT import *
     from OpenGL.GL import *
@@ -34,26 +35,10 @@ except ImportError:
     sys.exit()
 
 # Demo objects
-class DrawStyle(enum.Enum):
-    DYE_DENSITY = enum.auto()
-    FLOW_VELOCITY = enum.auto()
-
-
 @dataclass
 class MousePose:
     x: float
     y: float
-
-
-@dataclass
-class Window:
-    width_x: float
-    height_y: float
-    res: float
-    size: float = field(init=False)
-
-    def __post_init__(self):
-        self.size = self.res + 2
 
 # main code
 draw_style = DrawStyle.FLOW_VELOCITY
@@ -86,7 +71,7 @@ dens_new_source = np.zeros((window.size, window.size), float64)
 
 tf = TransformTree()
 boat = Boat(tf, (1, 5), 300/4, Pose(30, 15, 0), vel=Pose(0, 0, 0))  # n was 300
-print(sys.argv)
+print("system args:", sys.argv)
 
 if len(sys.argv) > 1 and sys.argv[1] == '1':
     controller = OpenLoopController(boat)
@@ -98,8 +83,6 @@ counter = 0
 in_bounds = True
 
 def clear_data():
-    """clear_data."""
-
     global dens, dens_new_source, window, vel, vel_new_source
 
     size = window.size
@@ -111,93 +94,7 @@ def clear_data():
     dens_new_source[0:size, 0:size] = 0.0
 
 
-def pre_display():
-    """pre_display."""
-
-    glViewport(0, 0, window.width_x, window.height_y)
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluOrtho2D(0.0, 1.0, 0.0, 1.0)
-    glClearColor(0.0, 0.0, 0.0, 1.0)
-    glClear(GL_COLOR_BUFFER_BIT)
-
-
-def post_display():
-    """post_display."""
-
-    glutSwapBuffers()
-
-def draw_boat():
-    h = 1.0 / window.res
-
-    # boat
-    glColor3f(1.0, 1.0, 1.0)
-    glPointSize(5.0)
-
-    glBegin(GL_POINTS)
-    for point in boat.tf.getTransformedPoses(boat.canoe_frame, boat.tf.root)[0].T:
-        glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
-    glEnd()
-
-    # paddles
-    glColor3f(0.5, 0.5, 1.0)
-    glPointSize(5.0)
-
-    glBegin(GL_POINTS)
-    for paddle in boat.all_paddle_list:
-        for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
-            glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
-    glEnd()
-
-
-def draw_velocity():
-    """draw_velocity."""
-
-    h = 1.0 / window.res
-
-    glColor3f(1.0, 1.0, 1.0)
-    glLineWidth(1.0)
-
-    glBegin(GL_LINES)
-    for i in range(1, window.res + 1):
-        x = (i - 0.5) * h
-        for j in range(1, window.res + 1):
-            y = (j - 0.5) * h
-            glColor3f(1, 0, 0)
-            glVertex2f(x, y)
-            glVertex2f(x + vel.u[i, j], y + vel.v[i, j])
-    glEnd()
-
-
-def draw_density():
-    """draw_density."""
-
-    h = 1.0 / window.res
-
-    glBegin(GL_QUADS)
-    for i in range(0, window.res + 1):
-        x = (i - 0.5) * h
-        for j in range(0, window.res + 1):
-            y = (j - 0.5) * h
-            d00 = dens[i, j]
-            d01 = dens[i, j + 1]
-            d10 = dens[i + 1, j]
-            d11 = dens[i + 1, j + 1]
-
-            glColor3f(d00, d00, d00)
-            glVertex2f(x, y)
-            glColor3f(d10, d10, d10)
-            glVertex2f(x + h, y)
-            glColor3f(d11, d11, d11)
-            glVertex2f(x + h, y + h)
-            glColor3f(d01, d01, d01)
-            glVertex2f(x, y + h)
-    glEnd()
-
-
 def get_from_UI(d, vel):
-    """get_from_UI."""
-
     global old_mouse_pose
 
     d[0:window.size, 0:window.size] = 0.0
@@ -225,8 +122,6 @@ def get_from_UI(d, vel):
 
 
 def key_func(key, mouse_x, mouse_y):
-    """key_func."""
-
     global draw_style
     mouse_pose = MousePose(mouse_x, mouse_y)  # unused
     if key == b'c' or key == b'C':
@@ -272,8 +167,6 @@ def key_func(key, mouse_x, mouse_y):
 
 
 def mouse_func(button, state, mouse_x, mouse_y):
-    """mouse_func."""
-
     global old_mouse_pose, curr_mouse_pose, mouse_down
 
     mouse_pose = MousePose(mouse_x, mouse_y)
@@ -282,16 +175,12 @@ def mouse_func(button, state, mouse_x, mouse_y):
 
 
 def motion_func(x, y):
-    """motion_func."""
-
     global curr_mouse_pose
 
     curr_mouse_pose = MousePose(x, y)
 
 
 def reshape_func(width, height):
-    """reshape_func."""
-
     global win_x, win_y
 
     glutReshapeWindow(width, height)
@@ -300,8 +189,6 @@ def reshape_func(width, height):
 
 
 def idle_func():
-    """idle_func."""
-
     global dens, dens_new_source, window, visc, dt, diff, vel, vel_new_source
     global boat, counter, in_bounds
 
@@ -329,32 +216,15 @@ def idle_func():
 
 
 def display_func():
-    """display_func."""
-
-    pre_display()
     if draw_style == DrawStyle.FLOW_VELOCITY:
-        draw_velocity()
+        gl.display_func(window, vel, boat, draw_style)
     elif draw_style == DrawStyle.DYE_DENSITY:
-        draw_density()
-    draw_boat()
-    post_display()
+        gl.display_func(window, dens, boat, draw_style)
 
 
 def open_glut_window():
-    """open_glut_window."""
-
-    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE)
-    glutInitWindowPosition(0, 0)
-    glutInitWindowSize(window.width_x, window.height_y)
-    glutCreateWindow("Alias | wavefront (porting by Alberto Santini)")
-    glClearColor(0.0, 0.0, 0.0, 1.0)
-    glClear(GL_COLOR_BUFFER_BIT)
-    glutSwapBuffers()
-    glClear(GL_COLOR_BUFFER_BIT)
-    glutSwapBuffers()
-
-    pre_display()
-
+    gl.open_glut_window()
+    gl.pre_display(window)
     glutKeyboardFunc(key_func)
     glutMouseFunc(mouse_func)
     glutMotionFunc(motion_func)
@@ -364,7 +234,6 @@ def open_glut_window():
 
 
 def run():
-    glutInit(sys.argv)
     clear_data()
     open_glut_window()
     glutMainLoop()

@@ -55,6 +55,8 @@ class Boat:
         self.all_frames = {self.canoe_frame} | {obj.frame for obj in self.all_paddle_list}
 
         # self.tf.renderTree()
+        self.out_of_bounds_debug = None
+
 
     def setPose(self, pose):
         self.pose = copy(pose).wrapAngle()
@@ -175,8 +177,9 @@ class Boat:
             obj_points_world_frame = obj_points_world_frame.T
             for index in obj_points_world_frame:
                 if (index[0] <= 0 or index[0] >= vel_field.sizex-2 or index[1] <= 0 or index[1] >= vel_field.sizey-2):
-                    print("not in bounds:",frame.id, frame.H)
-                    print(index, vel_field.sizex, vel_field.sizey)
+                    out_of_bounds_debug = (frame.id, frame.H, index)
+                    # print("not in bounds:",frame.id, frame.H)
+                    # print(index, vel_field.sizex, vel_field.sizey)
                     return False
         return True
 
