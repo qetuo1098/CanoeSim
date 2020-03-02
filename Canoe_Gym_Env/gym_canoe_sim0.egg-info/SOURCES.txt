@@ -1,0 +1,7 @@
+README.md
+setup.py
+gym_canoe_sim0.egg-info/PKG-INFO
+gym_canoe_sim0.egg-info/SOURCES.txt
+gym_canoe_sim0.egg-info/dependency_links.txt
+gym_canoe_sim0.egg-info/requires.txt
+gym_canoe_sim0.egg-info/top_level.txt
