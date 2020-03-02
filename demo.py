@@ -120,6 +120,8 @@ def get_from_UI(d, vel):
 
     old_mouse_pose = curr_mouse_pose
 
+    print("Mouse pose:", i, j)
+
 
 def key_func(key, mouse_x, mouse_y):
     global draw_style

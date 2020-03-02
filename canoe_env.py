@@ -16,12 +16,18 @@ class CanoeEnvParams:
     source: float64 = 100.0
     window_res: uint16 = 64
     window_size: uint16 = window_res + 2
-    target_pose: Pose = Pose(10, 10, 0)
-    reward_factor: float64 = 0.001  # very small for now
+    reward_angle_factor: float64 = 0.001  # very small for now
     canoe_shape: tuple = (1., 5.)
-    canoe_init_pose: Pose = Pose(30., 15., 0.)
-    canoe_init_vel: Pose = Pose(0, 0, 0)
-    stay_alive_reward: float64 = 1.2 * (window_size**2 + reward_factor * np.pi)
+    stay_alive_reward: float64 = 1.2 * (window_size**2 + reward_angle_factor * np.pi)
+    
+    canoe_init_pose: Pose = Pose()
+    target_pose: Pose = Pose()
+    canoe_init_vel: Pose = Pose()
+
+    def __init__(self, canoe_init_pose=Pose(30., 15., 0.), target_pose=Pose(10, 10, 0), canoe_init_vel=Pose(0, 0, 0)):
+        self.canoe_init_pose = canoe_init_pose
+        self.target_pose = target_pose
+        self.canoe_init_vel = canoe_init_vel
 
 
 class ConversionFactor:
@@ -37,10 +43,10 @@ class ConversionFactor:
 
 class CanoeEnv(gym.Env):
     metadata = {'render.modes': ['state', 'tf', 'opengl']}
-    def __init__(self, use_opengl=False):
+    def __init__(self, params, use_opengl=False):
         super(CanoeEnv, self).__init__()
         self.use_opengl = use_opengl
-        self.params = CanoeEnvParams()
+        self.params = params
         self.reset()
 
         # code for constant velocity source
@@ -103,11 +109,10 @@ class CanoeEnv(gym.Env):
         return obs
     
     def _calculateReward(self):
-        reward = self.params.stay_alive_reward -np.linalg.norm(self.boat.pose.point - self.params.target_pose.point) - self.params.reward_factor * abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))
+        reward = self.params.stay_alive_reward -np.linalg.norm(self.boat.pose.point - self.params.target_pose.point) - self.params.reward_angle_factor * abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))
         return reward
 
     def step(self, action):
-
         if self.done:
             print("WARNING: simulation is done")
         else:
@@ -125,6 +130,7 @@ class CanoeEnv(gym.Env):
         observation = self._constructObservation()
         reward = self._calculateReward()
         return (observation, reward, self.done, {})
+
     
     def render(self, mode='state'):
         if mode == 'state':
@@ -140,14 +146,14 @@ class CanoeEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    canoe_env = CanoeEnv(use_opengl=True)
+    canoe_env_params = CanoeEnvParams(canoe_init_pose=Pose(12., 13., 0.), target_pose=Pose(52., 56., 0))
+    canoe_env = CanoeEnv(canoe_env_params, use_opengl=True)
     done = False
     i = 0
     while not done:
         action = canoe_env.action_space.sample()
         (obs, reward, done, info) = canoe_env.step(action)
-        if i < 100:
-            canoe_env.render('opengl')
+        canoe_env.render('opengl')
         print(reward)
         if i > 500:
             canoe_env.reset()
