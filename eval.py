@@ -20,9 +20,14 @@ if __name__ == "__main__":
     # Enjoy trained agent
     obs = env.reset()
     done = False
+    total_reward = 0
+    gamma = 0.99
+    curr_gamma = 1.
     env.openOpenGL()
     while not done:
         action, _states = model.predict(obs)
         obs, reward, done, info = env.step(action)
-        print(reward)
+        total_reward += reward * curr_gamma
+        curr_gamma *= gamma
+        print(reward, total_reward)
         env.render('opengl')
