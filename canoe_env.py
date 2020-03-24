@@ -145,19 +145,24 @@ class CanoeEnv(gym.Env):
             gl.display_func(self.gl_window, self.vel, self.boat)
 
 
-if __name__ == "__main__":
+def run_main():
     canoe_env_params = CanoeEnvParams(canoe_init_pose=Pose(12., 13., 0.), target_pose=Pose(52., 56., 0))
-    canoe_env = CanoeEnv(canoe_env_params, use_opengl=True)
+    canoe_env = CanoeEnv(canoe_env_params, use_opengl=False)
     done = False
     i = 0
     while not done:
         action = canoe_env.action_space.sample()
         (obs, reward, done, info) = canoe_env.step(action)
-        canoe_env.render('opengl')
-        print(reward)
-        if i > 500:
-            canoe_env.reset()
-            canoe_env.render('tf')
-            i = 0
+        # canoe_env.render('opengl')
+        # print(reward)
+        if i > 100:
+            # canoe_env.reset()
+            # canoe_env.render('tf')
+            # i = 0
+            done = True
         i += 1
-        canoe_env.render()
+        # canoe_env.render()
+
+
+if __name__ == "__main__":
+    run_main()

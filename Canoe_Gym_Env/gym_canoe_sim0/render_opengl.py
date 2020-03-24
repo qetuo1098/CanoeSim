@@ -42,19 +42,29 @@ def draw_boat(window, boat):
 
     # boat
     glColor3f(1.0, 1.0, 1.0)
-    glPointSize(5.0)
+    glPointSize(3.0)
 
     glBegin(GL_POINTS)
     for point in boat.tf.getTransformedPoses(boat.canoe_frame, boat.tf.root)[0].T:
         glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
     glEnd()
 
-    # paddles
+    # noneffective paddles
     glColor3f(0.5, 0.5, 1.0)
-    glPointSize(5.0)
+    glPointSize(3.0)
 
     glBegin(GL_POINTS)
-    for paddle in boat.all_paddle_list:
+    for paddle in boat.noneffective_paddle_set:
+        for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
+            glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
+    glEnd()
+    
+    # effective paddles
+    glColor3f(0.5, 1.0, 0.5)
+    glPointSize(3.0)
+
+    glBegin(GL_POINTS)
+    for paddle in boat.effective_paddle_set:
         for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
             glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()

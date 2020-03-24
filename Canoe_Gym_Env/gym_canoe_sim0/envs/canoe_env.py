@@ -1,12 +1,10 @@
 import sys
-from gym_canoe_sim0.solver_c import *
-from gym_canoe_sim0.controller import *
-from random import uniform
 import gym
-from gym import spaces
-import gym_canoe_sim0.render_opengl as gl
+from gym_canoe_sim0.includes import *
+from random import uniform
 
 # main code
+np.seterr(all='raise')
 @dataclass
 class CanoeEnvParams:
     dt: float64 = 0.05
@@ -18,14 +16,17 @@ class CanoeEnvParams:
     window_size: uint16 = window_res + 2
     reward_angle_factor: float64 = 0.001  # very small for now
     canoe_shape: tuple = (1., 5.)
-    stay_alive_reward: float64 = 1.1 * (window_size**2 + reward_angle_factor * np.pi)
+    stay_alive_reward: float64 = 100.
+    # stay_alive_reward: float64 = 1.1 * (window_size**2 + reward_angle_factor * np.pi)
+    max_steps: np.uint64 = 1000000000
     
-    canoe_init_pose: Pose = Pose()
+    canoe_init_pose_range_x: tuple = (12., 55.)
+    canoe_init_pose_range_y: tuple = (12., 55.)
+    canoe_init_pose_range_theta: tuple = (-pi, pi)
     target_pose: Pose = Pose()
     canoe_init_vel: Pose = Pose()
 
-    def __init__(self, canoe_init_pose=Pose(12., 13., 0.), target_pose=Pose(52., 56., 0), canoe_init_vel=Pose(0, 0, 0)):
-        self.canoe_init_pose = canoe_init_pose
+    def __init__(self, target_pose=Pose(45., 45., 0), canoe_init_vel=Pose(0, 0, 0)):
         self.target_pose = target_pose
         self.canoe_init_vel = canoe_init_vel
 
@@ -47,7 +48,7 @@ class CanoeEnv(gym.Env):
         super(CanoeEnv, self).__init__()
         self.use_opengl = use_opengl
         self.params = params
-        self.reset()
+        self._selfReset()
 
         # code for constant velocity source
         # if len(sys.argv) > 1 and sys.argv[1] == '1':
@@ -70,19 +71,43 @@ class CanoeEnv(gym.Env):
         self.observation_space = spaces.Box(low=obs_range[0], high=obs_range[1], shape=(6+len(self.paddle_theta_factor),), dtype=float64)
         self.action_space = spaces.Box(low=action_range[0], high=action_range[1], shape=(len(self.paddle_action_factor),), dtype=float64)
 
+        self.reward_range = (-100, 10)
+
         if use_opengl:
             self.gl_window = gl.open_glut_window()
         return
+    
+    def setPose(self, new_pose):
+        self.boat.setPose(new_pose)  # add delta_pose to pose directly, since pose addition adds the delta_pose in the frame of the first pose
+        self.tf.changeFrame(self.boat.canoe_frame, self.tf.root, new_pose.point, new_pose.theta)
+    
+    def _sampleInitPose(self):
+        # use set pose for now
+        return Pose(12., 13., 0.)
+        init_pose_x = uniform(*self.params.canoe_init_pose_range_x)
+        init_pose_y = uniform(*self.params.canoe_init_pose_range_y)
+        init_pose_theta = uniform(*self.params.canoe_init_pose_range_theta)
+        return Pose(init_pose_x, init_pose_y, init_pose_theta)
 
-    def reset(self):
+    def openOpenGL(self):
+        assert not self.use_opengl
+        self.use_opengl = True
+        self.gl_window = gl.open_glut_window()
+
+    def _selfReset(self):
         self.vel = VelField(self.params.window_size, self.params.window_size)
         self.vel_new_source = copy(self.vel)
 
         self.tf = TransformTree()
-        self.boat = Boat(self.tf, self.params.canoe_shape, 300/4, self.params.canoe_init_pose, vel=self.params.canoe_init_vel)  # n was 300
+        init_pose = self._sampleInitPose()
+        self.boat = Boat(self.tf, self.params.canoe_shape, 300/4, init_pose, vel=self.params.canoe_init_vel)  # n was 300
         self.done = False
         self.time = 0
-        return
+
+    def reset(self):
+        # return observation at reset
+        self._selfReset()
+        return self._constructObservation()
 
     def _setNextAction(self, action):
         assert len(action) == len(self.boat.all_paddle_list)
@@ -109,10 +134,12 @@ class CanoeEnv(gym.Env):
         return obs
     
     def _calculateReward(self):
-        reward = self.params.stay_alive_reward -np.linalg.norm(self.boat.pose.point - self.params.target_pose.point) - self.params.reward_angle_factor * abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))
+        global_reward_factor = 0.1
+        reward = global_reward_factor * (self.params.stay_alive_reward -np.linalg.norm(self.boat.pose.point - self.params.target_pose.point) - self.params.reward_angle_factor * abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta)))
         return reward
 
     def step(self, action):
+        # print("action", action)
         if self.done:
             print("WARNING: simulation is done")
         else:
@@ -124,11 +151,21 @@ class CanoeEnv(gym.Env):
             vel_step(self.params.window_res, self.vel, self.vel_new_source, self.params.visc, self.params.dt, self.boat)
 
             self._setNextAction(action)
-            self.done = not self.boat.stepForward(self.vel, self.params.dt)
+            out_of_bounds = not self.boat.stepForward(self.vel, self.params.dt)
+
+        reward = self._calculateReward()
+        if out_of_bounds:
+            reward -= 100
         
+        if self.time > self.params.max_steps or out_of_bounds:
+            self.done = True
+            
         self.time += 1
         observation = self._constructObservation()
-        reward = self._calculateReward()
+        # print("obs", observation)
+
+        # assert self.use_opengl
+        # gl.display_func(self.gl_window, self.vel, self.boat)
         return (observation, reward, self.done, {})
 
     
@@ -146,8 +183,9 @@ class CanoeEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    canoe_env_params = CanoeEnvParams(canoe_init_pose=Pose(12., 13., 0.), target_pose=Pose(52., 56., 0))
+    canoe_env_params = CanoeEnvParams(target_pose=Pose(52., 56., 0))
     canoe_env = CanoeEnv(canoe_env_params, use_opengl=True)
+    canoe_env.setPose(Pose(12., 12., 0))
     done = False
     i = 0
     while not done:
@@ -155,7 +193,7 @@ if __name__ == "__main__":
         (obs, reward, done, info) = canoe_env.step(action)
         canoe_env.render('opengl')
         print(reward)
-        if i > 500:
+        if i > 512:
             canoe_env.reset()
             canoe_env.render('tf')
             i = 0

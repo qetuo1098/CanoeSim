@@ -56,7 +56,7 @@ def set_bnd(N, b, x):
 def lin_solve(N, b, x, x0, a, c):
     """lin_solve."""
 
-    for k in range(0, 20):
+    for k in range(0, 15):
         x[1:N + 1, 1:N + 1] = (x0[1:N + 1, 1:N + 1] + a *
                                (x[0:N, 1:N + 1] +
                                 x[2:N + 2, 1:N + 1] +
