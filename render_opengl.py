@@ -42,19 +42,29 @@ def draw_boat(window, boat):
 
     # boat
     glColor3f(1.0, 1.0, 1.0)
-    glPointSize(5.0)
+    glPointSize(3.0)
 
     glBegin(GL_POINTS)
     for point in boat.tf.getTransformedPoses(boat.canoe_frame, boat.tf.root)[0].T:
         glVertex2f((point[0]-0.5)*h, (point[1]-0.5)*h)
     glEnd()
 
-    # paddles
+    # noneffective paddles
     glColor3f(0.5, 0.5, 1.0)
-    glPointSize(5.0)
+    glPointSize(3.0)
 
     glBegin(GL_POINTS)
-    for paddle in boat.all_paddle_list:
+    for paddle in boat.noneffective_paddle_set:
+        for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
+            glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
+    glEnd()
+    
+    # effective paddles
+    glColor3f(0.5, 1.0, 0.5)
+    glPointSize(3.0)
+
+    glBegin(GL_POINTS)
+    for paddle in boat.effective_paddle_set:
         for point in boat.tf.getTransformedPoses(paddle.frame, boat.tf.root)[0].T:
             glVertex2f((point[0] - 0.5) * h, (point[1] - 0.5) * h)
     glEnd()
@@ -103,14 +113,23 @@ def draw_density(window, dens):
             glVertex2f(x, y + h)
     glEnd()
 
+def draw_target(window, target_pose):
+    h = 1.0 / window.res
+    glColor3f(1.0, 0.5, 0.5)
+    glPointSize(6.0)
 
-def display_func(window, field, boat, draw_style=DrawStyle.FLOW_VELOCITY):
+    glBegin(GL_POINTS)
+    glVertex2f((target_pose.point[0]-0.5)*h, (target_pose.point[1]-0.5)*h)
+    glEnd()
+
+def display_func(window, field, boat, target_pose=Pose(10, 10, 0), draw_style=DrawStyle.FLOW_VELOCITY):
     pre_display(window)
     if draw_style == DrawStyle.FLOW_VELOCITY:
         draw_velocity(window, field)
     elif draw_style == DrawStyle.DYE_DENSITY:
         draw_density(window, field)
     draw_boat(window, boat)
+    draw_target(window, target_pose)
     post_display()
 
 

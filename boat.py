@@ -46,8 +46,8 @@ class Boat:
         # handles are out of the water, paddles are in the water
         self.handleL = EndPaddle(pose=Pose(0, self.SHAPE[1]-0.5, 0), theta_max=(-pi/8, pi+pi/8), angular_vel_max=3, length=2, discretization=10, frame_id=FrameID.PADDLE_L1, parent_frame=self.canoe_frame, tf=tf)
         self.handleR = EndPaddle(pose=Pose(0, -self.SHAPE[1]+0.5, pi), theta_max=(-pi/8, pi+pi/8), angular_vel_max=3, length=2, discretization=10, frame_id=FrameID.PADDLE_R1, parent_frame=self.canoe_frame, tf=tf)
-        self.paddleL = MiddlePaddle(pose=Pose(2, 0, pi/2), theta_max=(-pi/2, pi/2), angular_vel_max=3, length=1.5, discretization=50, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
-        self.paddleR = MiddlePaddle(pose=Pose(2, 0, pi/2), theta_max=(-pi/2, pi/2), angular_vel_max=3, length=1.5, discretization=50, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
+        self.paddleL = MiddlePaddle(pose=Pose(2, 0, pi/2), theta_max=(-pi/2, pi/2), angular_vel_max=3, length=1, discretization=50, frame_id=FrameID.PADDLE_L2, parent_frame=self.handleL.frame, tf=tf)
+        self.paddleR = MiddlePaddle(pose=Pose(2, 0, pi/2), theta_max=(-pi/2, pi/2), angular_vel_max=3, length=1, discretization=50, frame_id=FrameID.PADDLE_R2, parent_frame=self.handleR.frame, tf=tf)
 
         self.effective_paddle_set = {self.paddleL, self.paddleR}  # "in the water", forces affect the canoe
         self.noneffective_paddle_set = {self.handleL, self.handleR}  # "out of water", force does not affect canoe

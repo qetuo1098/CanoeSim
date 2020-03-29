@@ -19,7 +19,7 @@ class OpenLoopController(Controller):
         self.interval = 14
         # self.all_paddle_list = [self.handleL, self.handleR, self.paddleL, self.paddleR]
         self.commands = np.vstack((
-            np.repeat(np.array([[0, 0, 0, 0.]]), self.interval, axis=0),
+            # np.repeat(np.array([[0, 0, 0, 0.]]), self.interval, axis=0),
             np.repeat(np.array([[1., -1., -1., -1.]]), 10, axis=0),
             np.repeat(np.array([[1, 0, 0, 0.]]), self.interval*7, axis=0),
             np.repeat(np.array([[-1, 0, 0, 0.]]), self.interval, axis=0),
@@ -42,7 +42,13 @@ class OpenLoopController(Controller):
             np.repeat(np.array([[-1., 1., 0, 0]]), self.interval, axis=0),
             np.repeat(np.array([[0, -1, 1., 1.]]), 13, axis=0),
             np.repeat(np.array([[1., -1., -1., -1.]]), self.interval, axis=0),
-
+            np.repeat(np.array([[-1., 1., 0, 0]]), self.interval, axis=0),
+            np.repeat(np.array([[0, -1, 1., 1.]]), 13, axis=0),
+            np.repeat(np.array([[1., -1., -1., -1.]]), self.interval, axis=0),
+            np.repeat(np.array([[-1., 1., 0, 0]]), self.interval, axis=0),
+            np.repeat(np.array([[0, -1, 1., 1.]]), 13, axis=0),
+            np.repeat(np.array([[1., -1., -1., -1.]]), self.interval, axis=0),
+            
             np.repeat(np.array([[0, 1., 0, 0]]), self.interval, axis=0),
             np.repeat(np.array([[-1., -1., 0, 0]]), self.interval*1.5, axis=0),
             np.repeat(np.array([[0, 0, 0, 0.]]), self.interval*2, axis=0),

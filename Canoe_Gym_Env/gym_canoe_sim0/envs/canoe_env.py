@@ -14,12 +14,15 @@ class CanoeEnvParams:
     source: float64 = 100.0
     window_res: uint16 = 64
     window_size: uint16 = window_res + 2
-    reward_distance_factor: float64 = 10
-    reward_angle_factor: float64 = 0.  # very small for now
+    reward_distance_factor: float64 = 5
+    reward_angle_factor: float64 = 80  # very small for now
+    reward_reach_goal: float64 = 200.
+    reach_goal_radius: float64 = 4.5
     canoe_shape: tuple = (1., 5.)
     stay_alive_reward: float64 = 0.
     # stay_alive_reward: float64 = 1.1 * (window_size**2 + reward_angle_factor * np.pi)
-    max_steps: np.uint64 = 1000000000
+    out_of_bounds_penalty: float64 = 100.
+    max_steps: np.uint64 = 2048
     
     canoe_init_pose_range_x: tuple = (12., 55.)
     canoe_init_pose_range_y: tuple = (12., 55.)
@@ -27,7 +30,7 @@ class CanoeEnvParams:
     target_pose: Pose = Pose()
     canoe_init_vel: Pose = Pose()
 
-    def __init__(self, target_pose=Pose(45., 45., 0), canoe_init_vel=Pose(0, 0, 0)):
+    def __init__(self, target_pose=Pose(50., 50., 0), canoe_init_vel=Pose(0, 0, 0)):
         self.target_pose = target_pose
         self.canoe_init_vel = canoe_init_vel
 
@@ -72,9 +75,7 @@ class CanoeEnv(gym.Env):
         self.observation_space = spaces.Box(low=obs_range[0], high=obs_range[1], shape=(6+len(self.paddle_theta_factor),), dtype=float64)
         self.action_space = spaces.Box(low=action_range[0], high=action_range[1], shape=(len(self.paddle_action_factor),), dtype=float64)
 
-        self.reward_range = (-100, 10)
-        self.last_distance = np.linalg.norm(self.boat.pose.point - self.params.target_pose.point)
-        self.last_angle_deviation = abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))
+        self.reward_range = (-100, 100)
 
         if use_opengl:
             self.gl_window = gl.open_glut_window()
@@ -86,10 +87,11 @@ class CanoeEnv(gym.Env):
     
     def _sampleInitPose(self):
         # use set pose for now
-        return Pose(12., 13., 0.)
+        # return Pose(12., 13., 0)
         init_pose_x = uniform(*self.params.canoe_init_pose_range_x)
         init_pose_y = uniform(*self.params.canoe_init_pose_range_y)
-        init_pose_theta = uniform(*self.params.canoe_init_pose_range_theta)
+        init_pose_theta = 0.
+        # init_pose_theta = uniform(*self.params.canoe_init_pose_range_theta)
         return Pose(init_pose_x, init_pose_y, init_pose_theta)
 
     def openOpenGL(self):
@@ -106,6 +108,9 @@ class CanoeEnv(gym.Env):
         self.boat = Boat(self.tf, self.params.canoe_shape, 300/4, init_pose, vel=self.params.canoe_init_vel)  # n was 300
         self.done = False
         self.time = 0
+        # initialize last_distance_deviation, last_angle_deviation by calling _calculateReward() once
+        self.last_distance_deviation, self.last_angle_deviation = 0, 0
+        self._calculateReward()
 
     def reset(self):
         # return observation at reset
@@ -133,12 +138,23 @@ class CanoeEnv(gym.Env):
 
         for i in range(len(self.boat.all_paddle_list)):
             obs[6+i] = self.paddle_theta_factor[i].convert(self.boat.all_paddle_list[i].theta)
-
+        # print(obs[:3])
         return obs
     
     def _calculateReward(self):
-        reward = self.params.stay_alive_reward + (self.last_distance - np.linalg.norm(self.boat.pose.point - self.params.target_pose.point)) * self.params.reward_distance_factor + (self.last_angle_deviation - abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))) * self.params.reward_angle_factor
+        deviation_from_goal = self.params.target_pose.point - self.boat.pose.point
+        distance_deviation = np.linalg.norm(deviation_from_goal)
+        angle_deviation = self.boat.pose.theta+np.pi/2 - np.arctan2(deviation_from_goal[1], deviation_from_goal[0])
+        angle_deviation = min(abs(angleWrap(angle_deviation)), abs(angleWrap(angle_deviation + np.pi)))  # canoe head and tail doesn't matter
+        # print("angle dev:", self.boat.pose.theta+np.pi/2, np.arctan2(deviation_from_goal[1], deviation_from_goal[0]), angle_deviation)
+
+        reward = self.params.stay_alive_reward + (self.last_distance_deviation - distance_deviation) * self.params.reward_distance_factor + (self.last_angle_deviation - angle_deviation) * self.params.reward_angle_factor
+        self.last_distance_deviation = distance_deviation
+        self.last_angle_deviation = angle_deviation
         return reward
+    
+    def _checkReachGoal(self):
+        return np.linalg.norm(self.boat.pose.point - self.params.target_pose.point) < self.params.reach_goal_radius
 
     def step(self, action):
         # print("action", action)
@@ -156,10 +172,12 @@ class CanoeEnv(gym.Env):
             out_of_bounds = not self.boat.stepForward(self.vel, self.params.dt)
 
         reward = self._calculateReward()
-        self.last_distance = np.linalg.norm(self.boat.pose.point - self.params.target_pose.point)
-        self.last_angle_deviation = abs(angleWrap(self.boat.pose.theta-self.params.target_pose.theta))
+        
         if out_of_bounds:
-            reward -= 100
+            reward -= self.params.out_of_bounds_penalty
+        if self._checkReachGoal():
+            self.done = True
+            reward += self.params.reward_reach_goal
         
         if self.time > self.params.max_steps or out_of_bounds:
             self.done = True
